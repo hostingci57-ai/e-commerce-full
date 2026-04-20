@@ -11,14 +11,17 @@
     "generate": "prisma generate",
     "migrate:dev": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
+    "db:init": "psql \"$DATABASE_URL_LANDLORD\" -f prisma/init-roles.sql && psql \"$DATABASE_URL_LANDLORD\" -f prisma/rls.sql",
     "rls:apply": "psql \"$DATABASE_URL\" -f prisma/init-roles.sql && psql \"$DATABASE_URL\" -f prisma/rls.sql",
     "db:init": "tsx scripts/apply-init.ts",
     "seed": "tsx prisma/seed.ts",
+    "db:reset": "prisma migrate reset --force --skip-seed && pnpm run db:init && pnpm run seed",
     "studio": "prisma studio",
     "typecheck": "tsc --noEmit",
     "lint": "echo skip"
   },
   "dependencies": {
+    "@node-rs/argon2": "^2.0.2",
     "@prisma/client": "^6.1.0"
   },
   "devDependencies": {

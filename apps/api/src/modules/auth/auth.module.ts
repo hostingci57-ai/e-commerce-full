@@ -5,6 +5,7 @@ import { JwtService } from './jwt.service';
 import { PasswordService } from './password.service';
 import { RefreshTokenRepository } from './refresh-token.repository';
 import { JwtGuard } from './guards/jwt.guard';
+import { OptionalJwtGuard } from './guards/optional-jwt.guard';
 import { LandlordGuard } from './guards/landlord.guard';
 import { TenantContextService } from '../../common/tenancy/tenant-context.service';
 import { AbilityFactory } from '../../common/rbac/ability.factory';
@@ -16,11 +17,12 @@ import { AbilityFactory } from '../../common/rbac/ability.factory';
     PasswordService,
     RefreshTokenRepository,
     JwtGuard,
+    OptionalJwtGuard,
     LandlordGuard,
     TenantContextService,
     AbilityFactory,
   ],
   controllers: [AuthController],
-  exports: [AuthService, JwtService, JwtGuard, LandlordGuard],
+  exports: [AuthService, JwtService, JwtGuard, OptionalJwtGuard, LandlordGuard],
 })
 export class AuthModule {}

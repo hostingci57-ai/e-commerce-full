@@ -76,13 +76,17 @@ export class TenantResolverMiddleware implements NestMiddleware {
   private async resolveBySubdomain(slug: string): Promise<{
     id: string;
     subdomain: string;
-    status: 'trial' | 'active' | 'suspended' | 'cancelled';
+    status: 'trial' | 'active' | 'suspended' | 'cancelled' | 'deleted';
   } | null> {
     const cacheKey = `tenant:subdomain:${slug}`;
     const cached = await this.redis.get(cacheKey).catch(() => null);
     if (cached) {
       try {
-        return JSON.parse(cached) as { id: string; subdomain: string; status: 'trial' | 'active' | 'suspended' | 'cancelled' };
+        return JSON.parse(cached) as {
+          id: string;
+          subdomain: string;
+          status: 'trial' | 'active' | 'suspended' | 'cancelled' | 'deleted';
+        };
       } catch {
         /* fall through */
       }

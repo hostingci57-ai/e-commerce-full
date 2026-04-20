@@ -1,4 +1,4 @@
-export type TenantStatus = 'trial' | 'active' | 'suspended' | 'cancelled';
+export type TenantStatus = 'trial' | 'active' | 'suspended' | 'cancelled' | 'deleted';
 
 export interface TenantContextShape {
   tenantId: string;

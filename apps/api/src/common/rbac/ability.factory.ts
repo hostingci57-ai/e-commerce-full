@@ -22,6 +22,7 @@ export type Subject =
   | 'MediaAsset'
   | 'Customer'
   | 'CustomerAddress'
+  | 'KvkkConsent'
   | 'Order'
   | 'Cart'
   | 'TenantMember'
@@ -50,6 +51,8 @@ export class AbilityFactory {
 
     if (ctx.audience === 'customer') {
       can('read', 'Product');
+      can('read', 'Category');
+      can('read', 'Brand');
       can(['create', 'read', 'update'], 'Cart');
       if (ctx.customerId) {
         // Casl 6 narrows conditions from the Subject union; cast since our
@@ -64,6 +67,12 @@ export class AbilityFactory {
           'CustomerAddress',
           { customerId: ctx.customerId },
         );
+        (can as unknown as (a: Action | Action[], s: Subject, c?: unknown) => unknown)(
+          ['read', 'update', 'delete'],
+          'Customer',
+          { id: ctx.customerId },
+        );
+        can(['create', 'read'], 'KvkkConsent');
       }
       return build();
     }
@@ -90,7 +99,11 @@ export class AbilityFactory {
           can('read', 'Order');
           can('update', 'Order');
           can('read', 'Customer');
+          can('read', 'CustomerAddress');
           can('read', 'Product');
+          can('read', 'ProductVariant');
+          can('read', 'Category');
+          can('read', 'Brand');
           break;
         case 'VIEWER':
           can('read', 'all');

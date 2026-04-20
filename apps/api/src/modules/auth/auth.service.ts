@@ -194,6 +194,43 @@ export class AuthService {
     });
   }
 
+  // --- Login (landlord) -----------------------------------------------------
+
+  async loginLandlord(args: {
+    email: string;
+    password: string;
+    ip?: string | null;
+    userAgent?: string | null;
+  }): Promise<AuthTokens> {
+    const landlord = await this.prisma.landlordUser.findUnique({
+      where: { email: args.email },
+    });
+    if (!landlord || landlord.disabledAt) {
+      throw new UnauthorizedException({
+        code: 'invalid_credentials',
+        message: 'Invalid email or password',
+      });
+    }
+    const ok = await this.passwords.verify(landlord.passwordHash, args.password);
+    if (!ok) {
+      throw new UnauthorizedException({
+        code: 'invalid_credentials',
+        message: 'Invalid email or password',
+      });
+    }
+
+    return this.issueTokens({
+      userId: landlord.id,
+      email: landlord.email,
+      audience: 'landlord',
+      tenantId: null,
+      customerId: null,
+      roles: ['OWNER'],
+      ip: args.ip,
+      userAgent: args.userAgent,
+    });
+  }
+
   // --- Refresh rotation -----------------------------------------------------
 
   async refresh(args: {
@@ -227,6 +264,31 @@ export class AuthService {
       });
     }
 
+    const audience = row.audience as JwtAudience;
+
+    // Landlord refresh: lookup landlord user separately
+    if (audience === 'landlord') {
+      const landlord = await this.prisma.landlordUser.findUnique({ where: { id: row.userId } });
+      if (!landlord || landlord.disabledAt) {
+        throw new UnauthorizedException({ code: 'landlord_disabled', message: 'Landlord user disabled' });
+      }
+      const tokens = await this.issueTokens({
+        userId: landlord.id,
+        email: landlord.email,
+        audience: 'landlord',
+        tenantId: null,
+        customerId: null,
+        roles: ['OWNER'],
+        ip: args.ip,
+        userAgent: args.userAgent,
+      });
+      const newRow = await this.prisma.refreshToken.findUnique({
+        where: { tokenHash: RefreshTokenRepository.hash(tokens.refreshToken) },
+      });
+      await this.refreshRepo.revoke(row.id, newRow?.id ?? null);
+      return tokens;
+    }
+
     const user = await this.prisma.user.findUnique({ where: { id: row.userId } });
     if (!user) {
       throw new UnauthorizedException({ code: 'user_not_found', message: 'User not found' });
@@ -235,7 +297,6 @@ export class AuthService {
     // Re-derive roles / customerId so rotated token reflects current state
     let roles: RoleCode[] = [];
     let customerId: string | null = null;
-    const audience = row.audience as JwtAudience;
 
     if (audience === 'staff' && row.tenantId) {
       const member = await this.prisma.tenantMember.findUnique({
@@ -329,6 +390,24 @@ export class AuthService {
   // --- /me ------------------------------------------------------------------
 
   async me(userId: string, tenantId: string | null, audience: JwtAudience) {
+    if (audience === 'landlord') {
+      const landlord = await this.prisma.landlordUser.findUnique({
+        where: { id: userId },
+        select: { id: true, email: true, name: true, createdAt: true },
+      });
+      if (!landlord) throw new UnauthorizedException({ code: 'landlord_not_found', message: 'Landlord not found' });
+      return {
+        id: landlord.id,
+        email: landlord.email,
+        firstName: landlord.name,
+        lastName: null,
+        phone: null,
+        createdAt: landlord.createdAt,
+        audience: 'landlord' as const,
+        tenantId: null,
+      };
+    }
+
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, email: true, firstName: true, lastName: true, phone: true, createdAt: true },

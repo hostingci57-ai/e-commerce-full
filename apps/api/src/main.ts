@@ -7,6 +7,9 @@ import helmet from '@fastify/helmet';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { RequestLoggingInterceptor } from './common/interceptors/request-logging.interceptor';
+import { BigIntSerializerInterceptor } from './common/interceptors/bigint-serializer.interceptor';
+import { MetricsInterceptor } from './common/metrics/metrics.interceptor';
+import { TenantContextService } from './common/tenancy/tenant-context.service';
 import { pinoNestLogger } from './common/logging/logger';
 
 async function bootstrap(): Promise<void> {
@@ -32,7 +35,9 @@ async function bootstrap(): Promise<void> {
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
   });
 
-  app.setGlobalPrefix('v1', { exclude: ['health', 'health/ready', 'docs', 'docs-json'] });
+  app.setGlobalPrefix('v1', {
+    exclude: ['health', 'health/ready', 'health/startup', 'metrics', 'docs', 'docs-json'],
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -43,7 +48,12 @@ async function bootstrap(): Promise<void> {
   );
 
   app.useGlobalFilters(new AllExceptionsFilter());
-  app.useGlobalInterceptors(new RequestLoggingInterceptor());
+  const tenantCtx = app.get(TenantContextService, { strict: false });
+  app.useGlobalInterceptors(
+    new RequestLoggingInterceptor(tenantCtx),
+    new MetricsInterceptor(),
+    new BigIntSerializerInterceptor(),
+  );
 
   if (process.env.NODE_ENV !== 'production') {
     const config = new DocumentBuilder()

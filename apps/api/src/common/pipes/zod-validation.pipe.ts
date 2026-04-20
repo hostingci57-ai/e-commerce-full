@@ -1,11 +1,16 @@
 import { BadRequestException, Injectable, PipeTransform } from '@nestjs/common';
-import type { ZodSchema } from 'zod';
+import type { ZodTypeAny, z } from 'zod';
 
+/**
+ * Zod pipe that accepts any ZodTypeAny — we key the output type off
+ * `z.infer<S>` so schemas with `.transform()` / `.default()` (input vs output
+ * shape differs) compile without cast gymnastics at the call site.
+ */
 @Injectable()
-export class ZodValidationPipe<T> implements PipeTransform<unknown, T> {
-  constructor(private readonly schema: ZodSchema<T>) {}
+export class ZodValidationPipe<S extends ZodTypeAny> implements PipeTransform<unknown, z.infer<S>> {
+  constructor(private readonly schema: S) {}
 
-  transform(value: unknown): T {
+  transform(value: unknown): z.infer<S> {
     const parsed = this.schema.safeParse(value);
     if (!parsed.success) {
       throw new BadRequestException({
@@ -14,6 +19,6 @@ export class ZodValidationPipe<T> implements PipeTransform<unknown, T> {
         details: parsed.error.flatten(),
       });
     }
-    return parsed.data;
+    return parsed.data as z.infer<S>;
   }
 }

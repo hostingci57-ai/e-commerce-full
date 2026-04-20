@@ -6,9 +6,8 @@ import {
 } from '@nestjs/common';
 import { Redis } from 'ioredis';
 import { randomUUID } from 'node:crypto';
-import type { PrismaClient } from '@ecf/db';
+import { withTenant } from '@ecf/db';
 import { REDIS_CLIENT } from '../../common/redis/redis.module';
-import { PRISMA } from '../../common/prisma/prisma.module';
 import { TenantContextService } from '../../common/tenancy/tenant-context.service';
 import { metrics } from '../../common/metrics/metrics.registry';
 import type { CartCoupon, CartLine, CartState, CartTotals, CartView } from './cart.types';
@@ -42,7 +41,6 @@ export interface CartOwner {
 export class CartService {
   constructor(
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
-    @Inject(PRISMA) private readonly prisma: PrismaClient,
     private readonly ctx: TenantContextService,
   ) {}
 
@@ -154,20 +152,27 @@ export class CartService {
     variantId: string,
     quantity: number,
   ): Promise<CartView> {
-    const variant = await this.prisma.productVariant.findUnique({
-      where: { id: variantId },
-      select: {
-        id: true,
-        tenantId: true,
-        productId: true,
-        sku: true,
-        priceMinorUnits: true,
-        currency: true,
-        stockOnHand: true,
-        stockReserved: true,
-        product: { select: { title: true, status: true } },
-      },
-    });
+    // RLS: run the variant lookup inside withTenant so app.current_tenant_id
+    // is set and RLS predicates pass (the `tenantId !== owner.tenantId`
+    // defense-in-depth check then stays meaningful).
+    const variant = await withTenant(
+      { tenantId: owner.tenantId, userId: this.ctx.userId },
+      (tx) =>
+        tx.productVariant.findUnique({
+          where: { id: variantId },
+          select: {
+            id: true,
+            tenantId: true,
+            productId: true,
+            sku: true,
+            priceMinorUnits: true,
+            currency: true,
+            stockOnHand: true,
+            stockReserved: true,
+            product: { select: { title: true, status: true } },
+          },
+        }),
+    );
     if (!variant || variant.tenantId !== owner.tenantId) {
       throw new NotFoundException({ code: 'variant_not_found', message: 'Variant not found' });
     }
@@ -230,10 +235,14 @@ export class CartService {
     if (!line) {
       throw new NotFoundException({ code: 'cart_line_not_found', message: 'Line not in cart' });
     }
-    const variant = await this.prisma.productVariant.findUnique({
-      where: { id: variantId },
-      select: { tenantId: true, stockOnHand: true, stockReserved: true },
-    });
+    const variant = await withTenant(
+      { tenantId: owner.tenantId, userId: this.ctx.userId },
+      (tx) =>
+        tx.productVariant.findUnique({
+          where: { id: variantId },
+          select: { tenantId: true, stockOnHand: true, stockReserved: true },
+        }),
+    );
     if (!variant || variant.tenantId !== owner.tenantId) {
       throw new NotFoundException({ code: 'variant_not_found', message: 'Variant not found' });
     }

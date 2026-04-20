@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import type { PrismaClient } from '@prisma/client';
+import type { PrismaClient, Prisma } from '@prisma/client';
 import { prisma } from './client';
 
 export interface TenantStore {
@@ -24,7 +24,17 @@ export function getTenantStore(): TenantStore {
  * of the ids is made available to nested code via `getTenantStore()`.
  */
 export async function withTenant<T>(
-  params: { tenantId: string; userId?: string | null },
+  params: {
+    tenantId: string;
+    userId?: string | null;
+    /**
+     * Optional isolation level for the interactive transaction. Defaults to
+     * the database default (ReadCommitted on Postgres). Use 'Serializable'
+     * for critical inventory/accounting paths where last-unit contention
+     * must serialise (Prisma wires this into BEGIN ISOLATION LEVEL ...).
+     */
+    isolationLevel?: Prisma.TransactionIsolationLevel;
+  },
   callback: (tx: Omit<PrismaClient, '$transaction' | '$connect' | '$disconnect' | '$on' | '$use' | '$extends'>) => Promise<T>,
 ): Promise<T> {
   const store: TenantStore = {
@@ -33,19 +43,22 @@ export async function withTenant<T>(
   };
 
   return als.run(store, async () => {
-    return prisma.$transaction(async (tx) => {
-      await tx.$executeRawUnsafe(
-        `SELECT set_config('app.current_tenant_id', $1, true)`,
-        params.tenantId,
-      );
-      if (params.userId) {
+    return prisma.$transaction(
+      async (tx) => {
         await tx.$executeRawUnsafe(
-          `SELECT set_config('app.current_user_id', $1, true)`,
-          params.userId,
+          `SELECT set_config('app.current_tenant_id', $1, true)`,
+          params.tenantId,
         );
-      }
-      return callback(tx);
-    });
+        if (params.userId) {
+          await tx.$executeRawUnsafe(
+            `SELECT set_config('app.current_user_id', $1, true)`,
+            params.userId,
+          );
+        }
+        return callback(tx);
+      },
+      params.isolationLevel ? { isolationLevel: params.isolationLevel } : undefined,
+    );
   });
 }
 

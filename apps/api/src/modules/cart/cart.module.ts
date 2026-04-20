@@ -6,6 +6,7 @@ import { TenantContextService } from '../../common/tenancy/tenant-context.servic
 import { AbilityFactory } from '../../common/rbac/ability.factory';
 import { PermissionsGuard } from '../../common/rbac/permissions.guard';
 import { JwtGuard } from '../auth/guards/jwt.guard';
+import { OptionalJwtGuard } from '../auth/guards/optional-jwt.guard';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
@@ -16,6 +17,7 @@ import { AuthModule } from '../auth/auth.module';
     AbilityFactory,
     PermissionsGuard,
     JwtGuard,
+    OptionalJwtGuard,
   ],
   controllers: [CartController],
   exports: [CartService],

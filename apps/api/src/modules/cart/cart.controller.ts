@@ -26,20 +26,20 @@ import {
 } from '@ecf/validation';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { JwtGuard } from '../auth/guards/jwt.guard';
+import { OptionalJwtGuard } from '../auth/guards/optional-jwt.guard';
 import { PermissionsGuard } from '../../common/rbac/permissions.guard';
 import { CheckAbility } from '../../common/rbac/permissions.decorator';
-import { Public } from '../../common/tenancy/tenancy.decorators';
 import { CartService } from './cart.service';
 import { getCartToken } from './cart-token.middleware';
 import { serializeCart } from './cart.serializer';
 
 @ApiTags('cart')
+@UseGuards(OptionalJwtGuard)
 @Controller('cart')
 export class CartController {
   constructor(private readonly cart: CartService) {}
 
   @ApiOperation({ summary: 'Get the current cart (guest via cookie, member via JWT)' })
-  @Public()
   @Get()
   async get(@Req() req: FastifyRequest) {
     const owner = this.cart.resolveOwner(getCartToken(req));
@@ -47,7 +47,6 @@ export class CartController {
   }
 
   @ApiOperation({ summary: 'Add an item to the cart' })
-  @Public()
   @HttpCode(HttpStatus.OK)
   @Post('items')
   async addItem(
@@ -59,7 +58,6 @@ export class CartController {
   }
 
   @ApiOperation({ summary: 'Update quantity of a cart line' })
-  @Public()
   @Patch('items/:variantId')
   async updateItem(
     @Req() req: FastifyRequest,
@@ -71,7 +69,6 @@ export class CartController {
   }
 
   @ApiOperation({ summary: 'Remove an item from the cart' })
-  @Public()
   @Delete('items/:variantId')
   async removeItem(
     @Req() req: FastifyRequest,
@@ -99,7 +96,6 @@ export class CartController {
   // --- Coupons (stubbed) ---------------------------------------------------
 
   @ApiOperation({ summary: 'Apply a coupon code (stub — returns 400)' })
-  @Public()
   @Post('coupon')
   async applyCoupon(
     @Req() req: FastifyRequest,
@@ -110,7 +106,6 @@ export class CartController {
   }
 
   @ApiOperation({ summary: 'Remove an applied coupon' })
-  @Public()
   @Delete('coupon/:code')
   async removeCoupon(@Req() req: FastifyRequest, @Param('code') code: string) {
     const owner = this.cart.resolveOwner(getCartToken(req));

@@ -6,10 +6,11 @@ import { InventoryModule } from '../inventory/inventory.module';
 import { OrdersModule } from '../orders/orders.module';
 import { TenantContextService } from '../../common/tenancy/tenant-context.service';
 import { AuthModule } from '../auth/auth.module';
+import { OptionalJwtGuard } from '../auth/guards/optional-jwt.guard';
 
 @Module({
   imports: [CartModule, InventoryModule, OrdersModule, AuthModule],
-  providers: [CheckoutService, TenantContextService],
+  providers: [CheckoutService, TenantContextService, OptionalJwtGuard],
   controllers: [CheckoutController],
   exports: [CheckoutService],
 })

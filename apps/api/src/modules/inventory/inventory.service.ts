@@ -1,5 +1,4 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import type { Prisma } from '@ecf/db';
 import { withTenant } from '@ecf/db';
 import { TenantContextService } from '../../common/tenancy/tenant-context.service';
 
@@ -59,16 +58,8 @@ export class InventoryService {
     const expiresAt = new Date(Date.now() + ttlMinutes * 60 * 1000);
 
     return withTenant(
-      { tenantId, userId: this.ctx.userId },
+      { tenantId, userId: this.ctx.userId, isolationLevel: 'Serializable' },
       async (tx) => {
-        // Raise isolation to Serializable for this sub-transaction — the
-        // withTenant outer tx is already interactive; we emulate pessimistic
-        // behaviour by doing a conditional UPDATE that fails if the stock
-        // math would go negative.
-        await (tx as unknown as Prisma.TransactionClient).$executeRawUnsafe(
-          'SET TRANSACTION ISOLATION LEVEL SERIALIZABLE',
-        );
-
         const ids: string[] = [];
         for (const line of lines) {
           const updated = await tx.productVariant.updateMany({
@@ -120,10 +111,7 @@ export class InventoryService {
    */
   async confirm(sessionId: string, orderId: string): Promise<void> {
     const tenantId = this.requireTenant();
-    await withTenant({ tenantId, userId: this.ctx.userId }, async (tx) => {
-      await (tx as unknown as Prisma.TransactionClient).$executeRawUnsafe(
-        'SET TRANSACTION ISOLATION LEVEL SERIALIZABLE',
-      );
+    await withTenant({ tenantId, userId: this.ctx.userId, isolationLevel: 'Serializable' }, async (tx) => {
       const reservations = await tx.inventoryReservation.findMany({
         where: { tenantId, sessionId, releasedAt: null },
       });
@@ -149,10 +137,7 @@ export class InventoryService {
    */
   async release(sessionId: string): Promise<void> {
     const tenantId = this.requireTenant();
-    await withTenant({ tenantId, userId: this.ctx.userId }, async (tx) => {
-      await (tx as unknown as Prisma.TransactionClient).$executeRawUnsafe(
-        'SET TRANSACTION ISOLATION LEVEL SERIALIZABLE',
-      );
+    await withTenant({ tenantId, userId: this.ctx.userId, isolationLevel: 'Serializable' }, async (tx) => {
       const reservations = await tx.inventoryReservation.findMany({
         where: { tenantId, sessionId, releasedAt: null },
       });

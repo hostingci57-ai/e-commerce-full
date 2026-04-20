@@ -15,6 +15,7 @@ import type {
 } from '@ecf/validation';
 import { TenantContextService } from '../../common/tenancy/tenant-context.service';
 import { OutboxService } from '../../common/outbox/outbox.service';
+import { CouponsService } from '../coupons/coupons.service';
 import { OrderStateMachine } from './order-state-machine';
 
 interface CreateOrderLineInput {
@@ -37,6 +38,9 @@ export interface CreateOrderInput {
   totalMinor: bigint;
   paymentProvider: string;
   paymentRef: string | null;
+  /** Optional applied coupon — when set the service redeems in the same tx. */
+  couponId?: string | null;
+  couponCode?: string | null;
   lines: CreateOrderLineInput[];
 }
 
@@ -45,6 +49,7 @@ export class OrdersService {
   constructor(
     private readonly ctx: TenantContextService,
     private readonly outbox: OutboxService,
+    private readonly coupons: CouponsService,
   ) {}
 
   private requireTenant(): string {
@@ -87,6 +92,8 @@ export class OrdersService {
           currency: input.currency,
           paymentProvider: input.paymentProvider,
           paymentRef: input.paymentRef,
+          couponCode: input.couponCode ?? null,
+          couponId: input.couponId ?? null,
           paidAt: initialStatus === 'payment_success' ? new Date() : null,
           lines: {
             create: input.lines.map((line) => ({
@@ -112,6 +119,16 @@ export class OrdersService {
         },
         select: { id: true, orderNumber: true, status: true },
       });
+
+      if (input.couponId && input.discountMinor > 0n) {
+        await this.coupons.redeem(tx, {
+          tenantId,
+          couponId: input.couponId,
+          orderId: order.id,
+          customerId: input.customerId,
+          discountApplied: input.discountMinor,
+        });
+      }
 
       await this.outbox.publish(tx, {
         tenantId,

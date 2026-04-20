@@ -8,9 +8,10 @@ import { PermissionsGuard } from '../../common/rbac/permissions.guard';
 import { JwtGuard } from '../auth/guards/jwt.guard';
 import { OptionalJwtGuard } from '../auth/guards/optional-jwt.guard';
 import { AuthModule } from '../auth/auth.module';
+import { CouponsModule } from '../coupons/coupons.module';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, CouponsModule],
   providers: [
     CartService,
     TenantContextService,

@@ -14,6 +14,7 @@ import {
   type SetShippingInput,
   type StartCheckoutInput,
 } from '@ecf/validation';
+import { withTenant } from '@ecf/db';
 import { REDIS_CLIENT } from '../../common/redis/redis.module';
 import { TenantContextService } from '../../common/tenancy/tenant-context.service';
 import { CartService, type CartOwner } from '../cart/cart.service';
@@ -72,6 +73,20 @@ export class CheckoutService {
       15,
     );
 
+    // Resolve an applied coupon (at most one in this release) to its row so
+    // complete() can redeem without a second lookup.
+    const appliedCoupon = cart.coupons[0];
+    let couponId: string | null = null;
+    if (appliedCoupon) {
+      const row = await withTenant({ tenantId: owner.tenantId }, (tx) =>
+        tx.coupon.findUnique({
+          where: { tenantId_code: { tenantId: owner.tenantId, code: appliedCoupon.code } },
+          select: { id: true },
+        }),
+      );
+      couponId = row?.id ?? null;
+    }
+
     const session: CheckoutSession = {
       token,
       tenantId: owner.tenantId,
@@ -82,6 +97,8 @@ export class CheckoutService {
         currency: cart.currency,
         subtotalMinor: cart.totals.subtotalMinor.toString(),
         discountMinor: cart.totals.discountMinor.toString(),
+        couponCode: appliedCoupon?.code ?? null,
+        couponId,
       },
       step: 'address',
       shippingAddress: null,
@@ -226,6 +243,8 @@ export class CheckoutService {
         totalMinor: total,
         paymentProvider: session.payment.method === 'cod' ? 'cod' : 'stub',
         paymentRef: session.payment.providerRef,
+        couponCode: cart.couponCode,
+        couponId: cart.couponId,
         lines: cart.items.map((i) => ({
           variantId: i.variantId,
           productId: i.productId,

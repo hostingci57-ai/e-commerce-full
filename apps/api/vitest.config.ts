@@ -8,5 +8,10 @@ export default defineConfig({
     testTimeout: 15_000,
     hookTimeout: 60_000,
     setupFiles: ['test/setup.ts'],
+    env: {
+      DATABASE_URL:
+        process.env.DATABASE_URL ??
+        'postgresql://test:test@localhost:5432/test_placeholder',
+    },
   },
 });

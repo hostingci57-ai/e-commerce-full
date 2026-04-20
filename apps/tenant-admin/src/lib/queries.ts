@@ -146,3 +146,153 @@ export function listCustomers(params: {
 export function getCustomer(id: string) {
   return api.get<CustomerListItem & Record<string, unknown>>(`/customers/${id}`);
 }
+
+// ----- Coupons --------------------------------------------------------------
+
+export type CouponType = 'PERCENT' | 'FIXED' | 'FREE_SHIPPING';
+
+export interface CouponListItem {
+  id: string;
+  code: string;
+  type: CouponType;
+  value: string | number;
+  minimumAmount?: string | number | null;
+  maximumDiscount?: string | number | null;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  usageLimit?: number | null;
+  usageLimitPerCustomer?: number | null;
+  usageCount: number;
+  stackable: boolean;
+  isActive: boolean;
+  customerGroupIds?: string[];
+  categoryIds?: string[];
+  productIds?: string[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CursorResponse<T> {
+  items: T[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+export function listCoupons(params: {
+  isActive?: boolean;
+  query?: string;
+  limit?: number;
+  cursor?: string;
+}) {
+  return api.get<CursorResponse<CouponListItem>>('/coupons', params);
+}
+export function getCoupon(id: string) {
+  return api.get<CouponListItem>(`/coupons/${id}`);
+}
+export function createCoupon(body: Partial<CouponListItem> & { code: string; type: CouponType; value: string | number }) {
+  return api.post<CouponListItem>('/coupons', body);
+}
+export function updateCoupon(id: string, body: Partial<CouponListItem>) {
+  return api.patch<CouponListItem>(`/coupons/${id}`, body);
+}
+export function deleteCoupon(id: string) {
+  return api.delete<{ ok: true }>(`/coupons/${id}`);
+}
+
+// ----- Refund requests ------------------------------------------------------
+
+export type RefundRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'COMPLETED' | 'CANCELLED';
+
+export interface RefundRequestItem {
+  id: string;
+  orderId: string;
+  customerId?: string | null;
+  reason: string;
+  reasonCategory: string;
+  requestedAmount: string | number;
+  status: RefundRequestStatus;
+  rejectionReason?: string | null;
+  createdAt?: string;
+  approvedAt?: string | null;
+}
+
+export function listRefundRequests(params: {
+  status?: RefundRequestStatus;
+  orderId?: string;
+  limit?: number;
+  cursor?: string;
+}) {
+  return api.get<CursorResponse<RefundRequestItem>>('/refund-requests', params);
+}
+export function getRefundRequest(id: string) {
+  return api.get<RefundRequestItem & { refunds: unknown[] }>(`/refund-requests/${id}`);
+}
+export function approveRefundRequest(
+  id: string,
+  body: { note?: string; approvedAmount?: string | number; partial?: boolean },
+) {
+  return api.post<RefundRequestItem>(`/refund-requests/${id}/approve`, body);
+}
+export function rejectRefundRequest(id: string, body: { rejectionReason: string }) {
+  return api.post<RefundRequestItem>(`/refund-requests/${id}/reject`, body);
+}
+
+// ----- Draft orders ---------------------------------------------------------
+
+export interface DraftOrderLineInput {
+  variantId: string;
+  quantity: number;
+  priceMinorUnits?: string | number;
+}
+
+export interface DraftOrderListItem {
+  id: string;
+  orderNumber?: string;
+  status: string;
+  currency?: string;
+  totalMinor?: string | number;
+  customerId?: string | null;
+  guestEmail?: string | null;
+  createdAt?: string;
+}
+
+export function listDraftOrders(params: {
+  query?: string;
+  customerId?: string;
+  limit?: number;
+  cursor?: string;
+}) {
+  return api.get<CursorResponse<DraftOrderListItem>>('/orders/draft', params);
+}
+export function getDraftOrder(id: string) {
+  return api.get<DraftOrderListItem & Record<string, unknown>>(`/orders/draft/${id}`);
+}
+export function createDraftOrder(body: {
+  customerId?: string | null;
+  guestEmail?: string | null;
+  currency: string;
+  shippingMinor?: string | number;
+  taxMinor?: string | number;
+  discountMinor?: string | number;
+  note?: string;
+  lines: DraftOrderLineInput[];
+}) {
+  return api.post<DraftOrderListItem>('/orders/draft', body);
+}
+export function updateDraftOrder(
+  id: string,
+  body: Partial<{
+    customerId: string | null;
+    guestEmail: string | null;
+    shippingMinor: string | number;
+    taxMinor: string | number;
+    discountMinor: string | number;
+    note: string;
+    lines: DraftOrderLineInput[];
+  }>,
+) {
+  return api.patch<DraftOrderListItem>(`/orders/draft/${id}`, body);
+}
+export function convertDraftOrder(id: string, body: { notifyCustomer?: boolean } = {}) {
+  return api.post<DraftOrderListItem>(`/orders/draft/${id}/convert`, body);
+}

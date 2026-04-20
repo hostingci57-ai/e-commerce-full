@@ -7,6 +7,9 @@ export interface CheckoutCartSnapshot {
   currency: string;
   subtotalMinor: string;
   discountMinor: string;
+  /** Applied coupon code + resolved id — redeemed at complete(). */
+  couponCode: string | null;
+  couponId: string | null;
 }
 
 export interface CheckoutAddress {

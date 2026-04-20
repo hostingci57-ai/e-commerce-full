@@ -8,6 +8,8 @@ import {
   Box,
   Layers,
   Package,
+  Percent,
+  Receipt,
   Settings,
   ShoppingCart,
   Tag,
@@ -27,6 +29,8 @@ const NAV: NavItem[] = [
   { href: '/categories', label: 'Kategoriler', icon: Layers },
   { href: '/brands', label: 'Markalar', icon: Tag },
   { href: '/orders', label: 'Siparişler', icon: ShoppingCart },
+  { href: '/orders/draft', label: 'Taslak Siparişler', icon: Receipt },
+  { href: '/coupons', label: 'Kuponlar', icon: Percent },
   { href: '/customers', label: 'Müşteriler', icon: Users },
   { href: '/settings', label: 'Ayarlar', icon: Settings },
 ];
@@ -76,9 +80,18 @@ export function Sidebar({
           <ul className="space-y-1">
             {NAV.map((item) => {
               const Icon = item.icon;
-              const active =
-                pathname === item.href ||
-                (item.href !== '/dashboard' && pathname.startsWith(item.href));
+              // Pick the longest href that prefixes the current path as the
+              // active nav — prevents /orders matching when we're on /orders/draft.
+              const bestHref = NAV.slice()
+                .map((n) => n.href)
+                .filter(
+                  (h) =>
+                    pathname === h ||
+                    (h !== '/dashboard' && pathname.startsWith(`${h}/`)) ||
+                    (h !== '/dashboard' && pathname === h),
+                )
+                .sort((a, b) => b.length - a.length)[0];
+              const active = item.href === bestHref;
               return (
                 <li key={item.href}>
                   <Link

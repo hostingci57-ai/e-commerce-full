@@ -22,6 +22,7 @@ import { JwtGuard } from '../auth/guards/jwt.guard';
 import { PermissionsGuard } from '../../common/rbac/permissions.guard';
 import { CheckAbility } from '../../common/rbac/permissions.decorator';
 import { OrdersService } from './orders.service';
+import { RefundsService } from '../refunds/refunds.service';
 
 /**
  * Customer-side order views + self-service mutations (cancel / refund).
@@ -31,7 +32,10 @@ import { OrdersService } from './orders.service';
 @Controller('customers/me/orders')
 @UseGuards(JwtGuard, PermissionsGuard)
 export class CustomerOrdersController {
-  constructor(private readonly orders: OrdersService) {}
+  constructor(
+    private readonly orders: OrdersService,
+    private readonly refunds: RefundsService,
+  ) {}
 
   @ApiOperation({ summary: "List the authenticated customer's orders" })
   @CheckAbility({ action: 'read', subject: 'Order' })
@@ -57,13 +61,13 @@ export class CustomerOrdersController {
     return this.orders.cancel(id, body, 'customer');
   }
 
-  @ApiOperation({ summary: 'Request a refund for one of my orders (FSD 4.6.3)' })
+  @ApiOperation({ summary: 'Request a refund for one of my orders (FSD 5.3.4)' })
   @CheckAbility({ action: 'update', subject: 'Order' })
   @Post(':id/refund-request')
   refundRequest(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body(new ZodValidationPipe(RefundRequestSchema)) body: RefundRequestInput,
   ) {
-    return this.orders.requestRefund(id, body);
+    return this.refunds.createRequest(id, body);
   }
 }

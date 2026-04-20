@@ -33,6 +33,7 @@ enum ProductStatus {
 }
 
 enum OrderStatus {
+  draft
   pending_payment
   payment_success
   preparing
@@ -42,6 +43,30 @@ enum OrderStatus {
   cancelled
   refund_requested
   refunded
+  partial_refunded
+}
+
+enum CouponType {
+  PERCENT
+  FIXED
+  FREE_SHIPPING
+}
+
+enum RefundReasonCategory {
+  DAMAGED
+  WRONG_ITEM
+  SIZE_ISSUE
+  NOT_AS_DESCRIBED
+  CHANGED_MIND
+  OTHER
+}
+
+enum RefundRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+  CANCELLED
 }
 
 enum OutboxStatus {
@@ -396,6 +421,12 @@ model Order {
   currency          String      @db.Char(3)
   paymentProvider   String      @default("stub")
   paymentRef        String?
+  /// True while the order is an admin-created draft (not yet placed by a customer).
+  /// Drafts are excluded from customer-facing queries + outbox events until converted.
+  isDraft           Boolean     @default(false) @map("is_draft")
+  /// Coupon applied during checkout (null when none). Redemption row is written on complete.
+  couponCode        String?     @map("coupon_code")
+  couponId          String?     @db.Uuid @map("coupon_id")
   placedAt          DateTime    @default(now())
   paidAt            DateTime?
   shippedAt         DateTime?
@@ -411,6 +442,7 @@ model Order {
   @@unique([tenantId, orderNumber])
   @@index([tenantId, status, placedAt])
   @@index([tenantId, customerId])
+  @@index([tenantId, isDraft])
   @@map("orders")
 }
 
@@ -509,4 +541,104 @@ model AuditEvent {
   @@index([tenantId, occurredAt])
   @@index([tenantId, eventType, occurredAt])
   @@map("audit_events")
+}
+
+// ----------- Coupons / Promotions (FSD 4.4.3 + 15) --------------------------
+
+model Coupon {
+  id                    String     @id @default(uuid()) @db.Uuid
+  tenantId              String     @db.Uuid
+  code                  String     @db.VarChar(64)
+  type                  CouponType
+  /// PERCENT: basis points (1000 = %10). FIXED: minor units. FREE_SHIPPING: 0.
+  value                 BigInt
+  /// Minor-unit minimum cart subtotal required for the coupon to apply.
+  minimumAmount         BigInt?
+  /// Cap on absolute discount in minor units (defends against unbounded percent deals).
+  maximumDiscount       BigInt?
+  startsAt              DateTime?
+  endsAt                DateTime?
+  /// Global usage limit across all customers.
+  usageLimit            Int?
+  /// Per-customer usage limit.
+  usageLimitPerCustomer Int?
+  usageCount            Int        @default(0)
+  stackable             Boolean    @default(false)
+  isActive              Boolean    @default(true)
+  /// When any of these arrays is non-empty the coupon is scoped to that subset.
+  customerGroupIds      String[]   @default([]) @db.Uuid
+  categoryIds           String[]   @default([]) @db.Uuid
+  productIds            String[]   @default([]) @db.Uuid
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+
+  redemptions           CouponRedemption[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, code])
+  @@index([tenantId, isActive, endsAt])
+  @@map("coupons")
+}
+
+model CouponRedemption {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @db.Uuid
+  couponId        String   @db.Uuid
+  orderId         String   @db.Uuid
+  customerId      String?  @db.Uuid
+  discountApplied BigInt
+  createdAt       DateTime @default(now())
+
+  coupon          Coupon   @relation(fields: [couponId], references: [id])
+
+  @@index([tenantId, couponId])
+  @@index([tenantId, customerId])
+  @@index([tenantId, orderId])
+  @@map("coupon_redemptions")
+}
+
+// ----------- Refunds (FSD 5.3.4) --------------------------------------------
+
+model RefundRequest {
+  id              String                @id @default(uuid()) @db.Uuid
+  tenantId        String                @db.Uuid
+  orderId         String                @db.Uuid
+  customerId      String?               @db.Uuid
+  reason          String
+  reasonCategory  RefundReasonCategory
+  requestedAmount BigInt
+  status          RefundRequestStatus   @default(PENDING)
+  /// Array of { orderItemId, qty, amount } — Json for flexible partial-return support.
+  itemSelections  Json
+  rejectionReason String?
+  approvedBy      String?               @db.Uuid
+  approvedAt      DateTime?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  refunds         Refund[]
+
+  @@index([tenantId, orderId])
+  @@index([tenantId, status])
+  @@map("refund_requests")
+}
+
+model Refund {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @db.Uuid
+  orderId         String   @db.Uuid
+  refundRequestId String   @db.Uuid
+  amount          BigInt
+  gatewayRefundId String?
+  /// "stub_completed" in MVP — no real gateway integration yet.
+  status          String   @default("stub_completed")
+  note            String?
+  createdBy       String?  @db.Uuid
+  createdAt       DateTime @default(now())
+
+  refundRequest   RefundRequest @relation(fields: [refundRequestId], references: [id])
+
+  @@index([tenantId, orderId])
+  @@index([tenantId, refundRequestId])
+  @@map("refunds")
 }

@@ -7,6 +7,7 @@ import helmet from '@fastify/helmet';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { RequestLoggingInterceptor } from './common/interceptors/request-logging.interceptor';
+import { BigIntSerializerInterceptor } from './common/interceptors/bigint-serializer.interceptor';
 import { pinoNestLogger } from './common/logging/logger';
 
 async function bootstrap(): Promise<void> {
@@ -43,7 +44,7 @@ async function bootstrap(): Promise<void> {
   );
 
   app.useGlobalFilters(new AllExceptionsFilter());
-  app.useGlobalInterceptors(new RequestLoggingInterceptor());
+  app.useGlobalInterceptors(new RequestLoggingInterceptor(), new BigIntSerializerInterceptor());
 
   if (process.env.NODE_ENV !== 'production') {
     const config = new DocumentBuilder()

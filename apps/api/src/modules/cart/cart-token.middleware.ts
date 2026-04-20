@@ -40,7 +40,12 @@ export class CartTokenMiddleware implements NestMiddleware {
   private setCookie(res: FastifyReply['raw'], name: string, value: string, maxAgeSec: number): void {
     // Avoid overwriting Set-Cookie headers that may already be present.
     const existing = res.getHeader('Set-Cookie');
-    const cookie = `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAgeSec}; HttpOnly; SameSite=Lax`;
+    const isProd = process.env.NODE_ENV === 'production';
+    // R-04: Secure flag in production so the cookie is only sent over HTTPS.
+    // HttpOnly+SameSite=Lax already present; Path=/ kept so cart + checkout
+    // requests on every tenant subdomain can read it.
+    const secure = isProd ? '; Secure' : '';
+    const cookie = `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAgeSec}; HttpOnly; SameSite=Lax${secure}`;
     if (!existing) {
       res.setHeader('Set-Cookie', cookie);
     } else if (Array.isArray(existing)) {

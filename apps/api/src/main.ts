@@ -21,14 +21,31 @@ async function bootstrap(): Promise<void> {
 
   app.useLogger(pinoNestLogger);
 
+  // R-06: helmet hardening. We keep CSP off for the JSON API surface but mount a
+  // tight CSP for /docs (Swagger) in non-production. Resource policy is tightened
+  // to "same-site" explicitly so subdomain attackers can't pull API JSON cross-origin.
   await app.register(helmet as never, {
     contentSecurityPolicy: false,
+    crossOriginResourcePolicy: { policy: 'same-site' },
+    crossOriginOpenerPolicy: { policy: 'same-origin' },
+    referrerPolicy: { policy: 'no-referrer' },
   });
 
-  const origins = (process.env.API_CORS_ORIGINS ?? '')
+  // CORS whitelist from env; falls back to storefront+admin URLs if CORS_ORIGINS
+  // is empty. In production we REFUSE to start with an empty list so a misconfig
+  // does not silently open the API to any origin.
+  const envOrigins = (process.env.API_CORS_ORIGINS ?? '')
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean);
+  const fallbackOrigins = [
+    process.env.NEXT_PUBLIC_STOREFRONT_URL,
+    process.env.NEXT_PUBLIC_ADMIN_URL,
+  ].filter((o): o is string => !!o);
+  const origins = envOrigins.length ? envOrigins : fallbackOrigins;
+  if (process.env.NODE_ENV === 'production' && origins.length === 0) {
+    throw new Error('API_CORS_ORIGINS must be set in production');
+  }
   app.enableCors({
     origin: origins.length ? origins : true,
     credentials: true,
@@ -39,11 +56,13 @@ async function bootstrap(): Promise<void> {
     exclude: ['health', 'health/ready', 'health/startup', 'metrics', 'docs', 'docs-json'],
   });
 
+  // R-14: strict validation — reject unknown fields. Zod pipes still handle
+  // body schemas per-route; this covers class-validator DTOs and query strings.
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       transform: true,
-      forbidNonWhitelisted: false,
+      forbidNonWhitelisted: true,
     }),
   );
 

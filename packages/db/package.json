@@ -12,6 +12,7 @@
     "migrate:dev": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
     "rls:apply": "psql \"$DATABASE_URL\" -f prisma/init-roles.sql && psql \"$DATABASE_URL\" -f prisma/rls.sql",
+    "db:init": "tsx scripts/apply-init.ts",
     "seed": "tsx prisma/seed.ts",
     "studio": "prisma studio",
     "typecheck": "tsc --noEmit",

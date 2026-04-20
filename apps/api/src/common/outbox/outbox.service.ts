@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@ecf/db';
+import { metrics } from '../metrics/metrics.registry';
 
 /**
  * Transactional Outbox (FSD 6.4). Writes an `outbox_events` row inside the
@@ -36,6 +37,7 @@ export class OutboxService {
       },
       select: { id: true },
     });
+    metrics.outboxEventsPublished.inc({ event_type: params.eventType });
     return row;
   }
 }

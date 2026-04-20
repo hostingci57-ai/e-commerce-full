@@ -23,6 +23,7 @@ enum TenantStatus {
   active
   suspended
   cancelled
+  deleted
 }
 
 enum ProductStatus {

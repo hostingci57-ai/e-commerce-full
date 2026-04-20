@@ -10,6 +10,7 @@ import type { PrismaClient } from '@ecf/db';
 import { REDIS_CLIENT } from '../../common/redis/redis.module';
 import { PRISMA } from '../../common/prisma/prisma.module';
 import { TenantContextService } from '../../common/tenancy/tenant-context.service';
+import { metrics } from '../../common/metrics/metrics.registry';
 import type { CartCoupon, CartLine, CartState, CartTotals, CartView } from './cart.types';
 
 /** Guest carts are purged 30d after last touch; member carts live until cleared. */
@@ -213,6 +214,7 @@ export class CartService {
     }
 
     await this.save(state, owner);
+    metrics.cartOperations.inc({ op: 'add' });
     return this.withTotals(state);
   }
 
@@ -244,6 +246,7 @@ export class CartService {
     }
     line.quantity = quantity;
     await this.save(state, owner);
+    metrics.cartOperations.inc({ op: 'update' });
     return this.withTotals(state);
   }
 
@@ -253,11 +256,13 @@ export class CartService {
     state.items = state.items.filter((i) => i.variantId !== variantId);
     if (state.items.length === 0) state.currency = null;
     await this.save(state, owner);
+    metrics.cartOperations.inc({ op: 'remove' });
     return this.withTotals(state);
   }
 
   async clear(owner: CartOwner): Promise<void> {
     await this.redis.del(this.keyFor(owner));
+    metrics.cartOperations.inc({ op: 'clear' });
   }
 
   // -------------------------------------------------------------------------

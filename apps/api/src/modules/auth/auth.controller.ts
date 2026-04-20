@@ -78,6 +78,20 @@ export class AuthController {
 
   @Public()
   @HttpCode(HttpStatus.OK)
+  @Post('landlord/login')
+  async loginLandlord(
+    @Body(new ZodValidationPipe(LoginSchema)) body: LoginInput,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.auth.loginLandlord({
+      ...body,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'] ?? null,
+    });
+  }
+
+  @Public()
+  @HttpCode(HttpStatus.OK)
   @Post('refresh')
   async refresh(
     @Body(new ZodValidationPipe(RefreshSchema)) body: RefreshInput,

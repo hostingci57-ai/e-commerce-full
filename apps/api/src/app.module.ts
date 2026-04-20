@@ -4,6 +4,7 @@ import { AppConfigModule } from './common/config/config.module';
 import { RedisModule } from './common/redis/redis.module';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { OutboxModule } from './common/outbox/outbox.module';
+import { MetricsModule } from './common/metrics/metrics.module';
 import { TenancyModule } from './modules/tenancy/tenancy.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { HealthModule } from './modules/health/health.module';
@@ -24,6 +25,7 @@ import { OrdersModule } from './modules/orders/orders.module';
     PrismaModule,
     RedisModule,
     OutboxModule,
+    MetricsModule,
     TenancyModule,
     AuthModule,
     HealthModule,

@@ -2,14 +2,16 @@ import { BadRequestException } from '@nestjs/common';
 import type { OrderStatus } from '@ecf/db';
 
 /**
- * Order finite state machine per FSD 5.3.3.
+ * Order finite state machine per FSD 5.3.3 / 5.3.4.
  *
+ *   draft           → pending_payment | cancelled          (admin drafts, Faz 6b)
  *   pending_payment → payment_success | cancelled
  *   payment_success → preparing | cancelled | refund_requested
  *   preparing       → shipped | cancelled | refund_requested
  *   shipped         → delivered | refund_requested
  *   delivered       → closed | refund_requested
- *   refund_requested→ refunded | cancelled
+ *   refund_requested→ refunded | partial_refunded | cancelled   (Faz 6b)
+ *   partial_refunded→ refund_requested | closed                  (further returns allowed)
  *
  *   closed / cancelled / refunded  → TERMINAL
  *
@@ -17,6 +19,7 @@ import type { OrderStatus } from '@ecf/db';
  * throw a BadRequestException.
  */
 const TRANSITIONS: Record<OrderStatus, readonly OrderStatus[]> = {
+  draft: ['pending_payment', 'cancelled'],
   pending_payment: ['payment_success', 'cancelled'],
   payment_success: ['preparing', 'cancelled', 'refund_requested'],
   preparing: ['shipped', 'cancelled', 'refund_requested'],
@@ -24,7 +27,8 @@ const TRANSITIONS: Record<OrderStatus, readonly OrderStatus[]> = {
   delivered: ['closed', 'refund_requested'],
   closed: [],
   cancelled: [],
-  refund_requested: ['refunded', 'cancelled'],
+  refund_requested: ['refunded', 'partial_refunded', 'cancelled'],
+  partial_refunded: ['refund_requested', 'closed'],
   refunded: [],
 };
 

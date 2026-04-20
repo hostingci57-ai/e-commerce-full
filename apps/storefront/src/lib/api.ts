@@ -187,6 +187,25 @@ export const api = {
         `/customers/me/orders/${encodeURIComponent(id)}/cancel`,
         { method: 'POST' },
       ),
+    refundRequest: (
+      id: string,
+      body: {
+        reason: string;
+        reasonCategory?:
+          | 'DAMAGED'
+          | 'WRONG_ITEM'
+          | 'SIZE_ISSUE'
+          | 'NOT_AS_DESCRIBED'
+          | 'CHANGED_MIND'
+          | 'OTHER';
+        requestedAmount?: string;
+        itemSelections?: { orderItemId: string; qty: number; amount: string }[];
+      },
+    ) =>
+      fetcher<{ id: string; status: string }>(
+        `/customers/me/orders/${encodeURIComponent(id)}/refund-request`,
+        { method: 'POST', body: JSON.stringify(body) },
+      ),
   },
 
   customer: {

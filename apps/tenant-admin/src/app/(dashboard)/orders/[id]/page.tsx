@@ -6,7 +6,15 @@ import { useParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ArrowLeft, Ban, Check } from 'lucide-react';
-import { cancelOrder, getOrder, updateOrderStatus } from '@/lib/queries';
+import {
+  approveRefundRequest,
+  cancelOrder,
+  getOrder,
+  listRefundRequests,
+  rejectRefundRequest,
+  updateOrderStatus,
+  type RefundRequestItem,
+} from '@/lib/queries';
 import {
   Button,
   Card,
@@ -95,11 +103,19 @@ export default function OrderDetailPage() {
     enabled: !!id,
   });
 
+  const refundsQ = useQuery({
+    queryKey: ['order', id, 'refunds'],
+    queryFn: () => listRefundRequests({ orderId: id, limit: 50 }),
+    enabled: !!id,
+  });
+
   const [statusOpen, setStatusOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState<{ id: string } | null>(null);
   const [nextStatus, setNextStatus] = useState<OrderStatus | ''>('');
   const [note, setNote] = useState('');
   const [reason, setReason] = useState('');
+  const [rejectReason, setRejectReason] = useState('');
 
   const statusMut = useMutation({
     mutationFn: () =>
@@ -126,6 +142,31 @@ export default function OrderDetailPage() {
     onError: (e: unknown) => {
       toast.error(e instanceof Error ? e.message : 'İptal edilemedi');
     },
+  });
+
+  const approveMut = useMutation({
+    mutationFn: (refundId: string) => approveRefundRequest(refundId, {}),
+    onSuccess: () => {
+      toast.success('İade onaylandı');
+      qc.invalidateQueries({ queryKey: ['order', id] });
+      qc.invalidateQueries({ queryKey: ['order', id, 'refunds'] });
+    },
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : 'Onaylanamadı'),
+  });
+
+  const rejectMut = useMutation({
+    mutationFn: ({ refundId, rejectionReason }: { refundId: string; rejectionReason: string }) =>
+      rejectRefundRequest(refundId, { rejectionReason }),
+    onSuccess: () => {
+      toast.success('İade reddedildi');
+      qc.invalidateQueries({ queryKey: ['order', id] });
+      qc.invalidateQueries({ queryKey: ['order', id, 'refunds'] });
+      setRejectOpen(null);
+      setRejectReason('');
+    },
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : 'Reddedilemedi'),
   });
 
   if (orderQ.isLoading) return <div className="text-slate-500">Yükleniyor…</div>;
@@ -275,43 +316,17 @@ export default function OrderDetailPage() {
             </CardBody>
           </Card>
 
-          {(o.refundRequests ?? []).length > 0 ? (
-            <Card>
-              <CardHeader title="İade Talepleri" />
-              <CardBody className="p-0">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-50">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Tarih
-                      </th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Tutar
-                      </th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Sebep
-                      </th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Durum
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {o.refundRequests!.map((r) => (
-                      <tr key={r.id}>
-                        <td className="px-4 py-3">{formatDateTime(r.createdAt)}</td>
-                        <td className="px-4 py-3">
-                          {formatMoney(r.amount ?? 0, o.currency ?? 'TRY')}
-                        </td>
-                        <td className="px-4 py-3 text-slate-600">{r.reason ?? '—'}</td>
-                        <td className="px-4 py-3">{r.status}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </CardBody>
-            </Card>
-          ) : null}
+          <RefundRequestsCard
+            currency={o.currency ?? 'TRY'}
+            refunds={refundsQ.data?.items ?? []}
+            onApprove={(r) => {
+              if (confirm(`${r.id.slice(0, 8)} iade talebini onayla?`)) {
+                approveMut.mutate(r.id);
+              }
+            }}
+            onReject={(r) => setRejectOpen({ id: r.id })}
+            approving={approveMut.isPending}
+          />
         </div>
 
         <div className="space-y-4">
@@ -415,7 +430,116 @@ export default function OrderDetailPage() {
           />
         </FormField>
       </Dialog>
+
+      <Dialog
+        open={!!rejectOpen}
+        onClose={() => setRejectOpen(null)}
+        title="İade talebini reddet"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setRejectOpen(null)}>
+              Vazgeç
+            </Button>
+            <Button
+              variant="danger"
+              loading={rejectMut.isPending}
+              disabled={!rejectReason.trim()}
+              onClick={() =>
+                rejectOpen &&
+                rejectMut.mutate({
+                  refundId: rejectOpen.id,
+                  rejectionReason: rejectReason.trim(),
+                })
+              }
+            >
+              Reddet
+            </Button>
+          </>
+        }
+      >
+        <FormField label="Red sebebi" required>
+          <Textarea
+            rows={3}
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            placeholder="Müşteriye iletilecek açıklama"
+          />
+        </FormField>
+      </Dialog>
     </div>
+  );
+}
+
+function RefundRequestsCard({
+  refunds,
+  currency,
+  onApprove,
+  onReject,
+  approving,
+}: {
+  refunds: RefundRequestItem[];
+  currency: string;
+  onApprove: (r: RefundRequestItem) => void;
+  onReject: (r: RefundRequestItem) => void;
+  approving: boolean;
+}) {
+  if (refunds.length === 0) return null;
+  return (
+    <Card>
+      <CardHeader title="İade Talepleri" />
+      <CardBody className="p-0">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50">
+            <tr>
+              <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Tarih
+              </th>
+              <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Tutar
+              </th>
+              <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Sebep
+              </th>
+              <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Durum
+              </th>
+              <th className="px-4 py-2" />
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {refunds.map((r) => (
+              <tr key={r.id}>
+                <td className="px-4 py-3">{formatDateTime(r.createdAt)}</td>
+                <td className="px-4 py-3">
+                  {formatMoney(r.requestedAmount ?? 0, currency)}
+                </td>
+                <td className="px-4 py-3 text-slate-600">
+                  <div className="font-medium">{r.reasonCategory}</div>
+                  <div className="text-xs text-slate-500">{r.reason}</div>
+                </td>
+                <td className="px-4 py-3">{r.status}</td>
+                <td className="px-4 py-3">
+                  {r.status === 'PENDING' ? (
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        size="sm"
+                        loading={approving}
+                        onClick={() => onApprove(r)}
+                      >
+                        Onayla
+                      </Button>
+                      <Button size="sm" variant="danger" onClick={() => onReject(r)}>
+                        Reddet
+                      </Button>
+                    </div>
+                  ) : null}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </CardBody>
+    </Card>
   );
 }
 

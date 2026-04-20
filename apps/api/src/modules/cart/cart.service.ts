@@ -10,6 +10,8 @@ import { withTenant } from '@ecf/db';
 import { REDIS_CLIENT } from '../../common/redis/redis.module';
 import { TenantContextService } from '../../common/tenancy/tenant-context.service';
 import { metrics } from '../../common/metrics/metrics.registry';
+import { CouponsService } from '../coupons/coupons.service';
+import type { CartForCoupon } from '../coupons/coupons.types';
 import type { CartCoupon, CartLine, CartState, CartTotals, CartView } from './cart.types';
 
 /** Guest carts are purged 30d after last touch; member carts live until cleared. */
@@ -42,6 +44,7 @@ export class CartService {
   constructor(
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     private readonly ctx: TenantContextService,
+    private readonly couponsService: CouponsService,
   ) {}
 
   // -------------------------------------------------------------------------
@@ -275,21 +278,75 @@ export class CartService {
   }
 
   // -------------------------------------------------------------------------
-  // Coupons (stub — no coupon table yet, any code is rejected)
+  // Coupons — see CouponsService for the evaluation engine.
   // -------------------------------------------------------------------------
 
-  async applyCoupon(_owner: CartOwner, _code: string): Promise<CartView> {
-    throw new BadRequestException({
-      code: 'coupon_not_implemented',
-      message: 'Coupon engine is not implemented yet',
+  async applyCoupon(owner: CartOwner, code: string): Promise<CartView> {
+    const state = (await this.loadStateForWrite(owner)) ?? this.empty(owner, this.keyFor(owner));
+    if (state.items.length === 0) {
+      throw new BadRequestException({
+        code: 'cart_empty',
+        message: 'Cannot apply a coupon to an empty cart',
+      });
+    }
+    const normalized = code.trim().toUpperCase();
+    const already = state.coupons.find((c) => c.code === normalized);
+    if (already) {
+      throw new BadRequestException({
+        code: 'coupon_already_applied',
+        message: `Coupon ${normalized} is already applied`,
+      });
+    }
+    // Build the pure-evaluation input from Redis cart state.
+    let subtotal = 0n;
+    for (const line of state.items) {
+      subtotal += BigInt(line.priceMinor) * BigInt(line.quantity);
+    }
+    const cartInput: CartForCoupon = {
+      subtotalMinor: subtotal,
+      currency: state.currency ?? 'TRY',
+      items: state.items.map((i) => ({
+        variantId: i.variantId,
+        productId: i.productId,
+        quantity: i.quantity,
+        priceMinor: i.priceMinor,
+      })),
+    };
+    const result = await this.couponsService.validateAndCalculate(normalized, cartInput, {
+      customerId: owner.customerId,
     });
+    if (!result.valid) {
+      throw new BadRequestException({
+        code: result.reason ?? 'coupon_invalid',
+        message: `Coupon ${normalized} is not applicable`,
+      });
+    }
+    // Stackable check — reject if adding to a non-stackable set.
+    if (state.coupons.length > 0) {
+      throw new BadRequestException({
+        code: 'coupon_not_stackable',
+        message: 'Only one coupon can be applied at a time in this release',
+      });
+    }
+    state.coupons.push({
+      code: normalized,
+      discountMinor: result.discountMinor.toString(),
+      appliedAt: new Date().toISOString(),
+    });
+    await this.save(state, owner);
+    metrics.cartOperations.inc({ op: 'coupon_apply' });
+    return this.withTotals(state);
   }
 
   async removeCoupon(owner: CartOwner, code: string): Promise<CartView> {
     const state = await this.loadStateForWrite(owner);
     if (!state) return this.withTotals(this.empty(owner, this.keyFor(owner)));
-    state.coupons = state.coupons.filter((c: CartCoupon) => c.code !== code);
+    const normalized = code.trim().toUpperCase();
+    state.coupons = state.coupons.filter(
+      (c: CartCoupon) => c.code !== normalized && c.code !== code,
+    );
     await this.save(state, owner);
+    metrics.cartOperations.inc({ op: 'coupon_remove' });
     return this.withTotals(state);
   }
 

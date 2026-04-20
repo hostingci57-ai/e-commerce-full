@@ -3,15 +3,26 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { Button } from '@/components/Button';
 import { OrderStatusBadge } from '@/components/OrderStatusBadge';
+import { RefundRequestModal } from '@/components/RefundRequestModal';
 import { Spinner } from '@/components/Spinner';
 import { formatDate, formatPrice } from '@/lib/format';
 import type { OrderSummary, Paginated } from '@/lib/types';
+
+const REFUND_ELIGIBLE = new Set([
+  'payment_success',
+  'preparing',
+  'shipped',
+  'delivered',
+  'partial_refunded',
+]);
 
 export default function OrdersPage() {
   const [data, setData] = useState<Paginated<OrderSummary> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refundOrderId, setRefundOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -68,7 +79,7 @@ export default function OrdersPage() {
       {data.items.map((o) => (
         <div
           key={o.id}
-          className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4"
         >
           <div>
             <p className="text-sm text-slate-500">
@@ -84,9 +95,31 @@ export default function OrdersPage() {
             <span className="font-semibold">
               {formatPrice(o.total, o.currency)}
             </span>
+            {REFUND_ELIGIBLE.has(o.status) ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setRefundOrderId(o.id)}
+              >
+                Iade Talebi Olustur
+              </Button>
+            ) : null}
           </div>
         </div>
       ))}
+      {refundOrderId ? (
+        <RefundRequestModal
+          orderId={refundOrderId}
+          onClose={() => setRefundOrderId(null)}
+          onSuccess={() => {
+            // refetch
+            void (async () => {
+              const res = await api.orders.me();
+              setData(res);
+            })();
+          }}
+        />
+      ) : null}
     </div>
   );
 }

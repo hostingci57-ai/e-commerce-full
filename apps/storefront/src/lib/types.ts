@@ -118,14 +118,17 @@ export interface CheckoutSession {
 }
 
 export type OrderStatus =
+  | 'draft'
   | 'pending_payment'
   | 'payment_success'
   | 'preparing'
   | 'shipped'
   | 'delivered'
+  | 'closed'
   | 'cancelled'
   | 'refund_requested'
-  | 'refunded';
+  | 'refunded'
+  | 'partial_refunded';
 
 export interface OrderSummary {
   id: string;

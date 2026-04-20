@@ -2,6 +2,14 @@
 -- ECF — Database roles
 -- Must be run by a superuser AFTER the Prisma migrate has created all tables.
 -- Idempotent: safe to re-run.
+--
+-- NOTE: This file contains placeholder tokens for the role passwords. It is
+-- NOT intended to be run directly with `psql -f`. Apply it through
+-- `pnpm --filter @ecf/db db:init`, which substitutes:
+--   %%ECF_APP_PASSWORD%%      → $ECF_APP_PASSWORD
+--   %%ECF_LANDLORD_PASSWORD%% → $ECF_LANDLORD_PASSWORD
+-- For production, generate strong passwords (>= 32 random chars) and set the
+-- env vars via your secret manager. Never commit real passwords to git.
 -- =============================================================================
 
 -- Required extensions
@@ -13,11 +21,15 @@ CREATE EXTENSION IF NOT EXISTS citext;
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ecf_app') THEN
-    CREATE ROLE ecf_app LOGIN PASSWORD 'ecf_app_dev';
+    CREATE ROLE ecf_app LOGIN PASSWORD '%%ECF_APP_PASSWORD%%';
+  ELSE
+    ALTER ROLE ecf_app WITH LOGIN PASSWORD '%%ECF_APP_PASSWORD%%';
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ecf_landlord') THEN
-    CREATE ROLE ecf_landlord LOGIN PASSWORD 'ecf_landlord_dev' BYPASSRLS;
+    CREATE ROLE ecf_landlord LOGIN PASSWORD '%%ECF_LANDLORD_PASSWORD%%' BYPASSRLS;
+  ELSE
+    ALTER ROLE ecf_landlord WITH LOGIN PASSWORD '%%ECF_LANDLORD_PASSWORD%%' BYPASSRLS;
   END IF;
 END$$;
 

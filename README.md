@@ -38,9 +38,12 @@ cp .env.example .env
 pnpm db:generate
 pnpm db:migrate
 
-# 5. Apply RLS + roles (raw SQL, run AFTER first migration)
-psql "postgresql://smart:1@localhost:5432/e_commerce_full" -f packages/db/prisma/init-roles.sql
-psql "postgresql://smart:1@localhost:5432/e_commerce_full" -f packages/db/prisma/rls.sql
+# 5. Apply RLS + roles (reads ECF_APP_PASSWORD + ECF_LANDLORD_PASSWORD from env,
+#    substitutes the placeholders in init-roles.sql, then runs rls.sql).
+#    For PRODUCTION, generate strong random passwords (>=32 chars) and set
+#    ECF_APP_PASSWORD / ECF_LANDLORD_PASSWORD in your secret manager — never
+#    commit real values.
+pnpm --filter @ecf/db db:init
 ```
 
 ## Dev

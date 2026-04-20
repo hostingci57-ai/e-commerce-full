@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import type { FastifyRequest } from 'fastify';
 import {
   CheckoutAddressSchema,
@@ -31,6 +32,7 @@ import { CheckoutService } from './checkout.service';
 
 @ApiTags('checkout')
 @UseGuards(OptionalJwtGuard)
+@Throttle({ default: { limit: 20, ttl: 60_000 } })
 @Controller('checkout')
 export class CheckoutController {
   constructor(

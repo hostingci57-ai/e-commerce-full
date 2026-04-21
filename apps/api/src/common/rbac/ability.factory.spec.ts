@@ -99,7 +99,8 @@ describe('AbilityFactory', () => {
       expect(ab.can('create', 'Product')).toBe(false);
       expect(ab.can('delete', 'Product')).toBe(false);
       expect(ab.can('delete', 'Order')).toBe(false);
-      expect(ab.can('create', 'Order')).toBe(false);
+      // ORDER_OPERATOR may create draft orders (Faz 6b) — CREATE is allowed by design.
+      expect(ab.can('create', 'Order')).toBe(true);
     });
   });
 

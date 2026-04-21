@@ -24,6 +24,9 @@ import { MediaModule } from './modules/media/media.module';
 import { CmsModule } from './modules/cms/cms.module';
 import { SeoModule } from './modules/seo/seo.module';
 import { I18nModule } from './modules/i18n/i18n.module';
+import { PaymentsModule } from './modules/payments/payments.module';
+import { ApiShippingModule } from './modules/shipping/shipping.module';
+import { TenantSettingsModule } from './modules/tenant-settings/tenant-settings.module';
 
 @Module({
   imports: [
@@ -55,6 +58,9 @@ import { I18nModule } from './modules/i18n/i18n.module';
     CmsModule,
     SeoModule,
     I18nModule,
+    PaymentsModule,
+    ApiShippingModule,
+    TenantSettingsModule,
   ],
 })
 export class AppModule {}

@@ -43,7 +43,12 @@ DECLARE
     'redirects',
     'seo_settings',
     'tenant_languages',
-    'ui_string_bundles'
+    'ui_string_bundles',
+    'payment_method_configs',
+    'payments',
+    'shipping_method_configs',
+    'shipments',
+    'tenant_settings'
   ];
 BEGIN
   FOREACH t IN ARRAY tenant_tables LOOP
@@ -165,6 +170,27 @@ CREATE POLICY tenant_isolation ON tenant_languages
   WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
 
 CREATE POLICY tenant_isolation ON ui_string_bundles
+  USING      (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+  WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
+
+-- Providers + Settings tenant-scoped tables
+CREATE POLICY tenant_isolation ON payment_method_configs
+  USING      (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+  WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
+
+CREATE POLICY tenant_isolation ON payments
+  USING      (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+  WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
+
+CREATE POLICY tenant_isolation ON shipping_method_configs
+  USING      (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+  WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
+
+CREATE POLICY tenant_isolation ON shipments
+  USING      (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+  WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
+
+CREATE POLICY tenant_isolation ON tenant_settings
   USING      (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
   WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
 

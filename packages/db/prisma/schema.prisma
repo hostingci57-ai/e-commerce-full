@@ -36,6 +36,7 @@ enum OrderStatus {
   draft
   pending_payment
   payment_success
+  payment_failed
   preparing
   shipped
   delivered
@@ -80,6 +81,24 @@ enum JwtAudience {
   customer
   staff
   landlord
+}
+
+enum PaymentStatus {
+  PENDING
+  AUTHORIZED
+  CAPTURED
+  FAILED
+  REFUNDED
+  PARTIAL_REFUNDED
+}
+
+enum ShipmentStatus {
+  PENDING
+  LABEL_CREATED
+  SHIPPED
+  IN_TRANSIT
+  DELIVERED
+  RETURNED
 }
 
 // =============================================================================
@@ -809,4 +828,107 @@ model UiStringBundle {
 
   @@id([tenantId, languageCode, namespace])
   @@map("ui_string_bundles")
+}
+
+// ----------- Payment / Shipping providers (FSD 4.5.3 / 4.5.4 / 5.6) ---------
+
+model PaymentMethodConfig {
+  tenantId     String   @map("tenant_id") @db.Uuid
+  id           String   @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  providerCode String   @map("provider_code")
+  displayName  String   @map("display_name")
+  description  String?
+  config       Json     @default("{}")
+  isActive     Boolean  @default(true) @map("is_active")
+  sortOrder    Int      @default(0) @map("sort_order")
+  minAmount    BigInt?  @map("min_amount")
+  maxAmount    BigInt?  @map("max_amount")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@id([tenantId, id])
+  @@unique([tenantId, providerCode])
+  @@map("payment_method_configs")
+}
+
+model Payment {
+  tenantId      String        @map("tenant_id") @db.Uuid
+  id            String        @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId       String        @map("order_id") @db.Uuid
+  providerCode  String        @map("provider_code")
+  providerRef   String?       @map("provider_ref")
+  amount        BigInt
+  currency      String        @default("TRY") @db.VarChar(3)
+  status        PaymentStatus @default(PENDING)
+  failureReason String?       @map("failure_reason")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  @@id([tenantId, id])
+  @@index([tenantId, orderId])
+  @@map("payments")
+}
+
+model ShippingMethodConfig {
+  tenantId              String   @map("tenant_id") @db.Uuid
+  id                    String   @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  providerCode          String   @map("provider_code")
+  code                  String
+  displayName           String   @map("display_name")
+  description           String?
+  config                Json     @default("{}")
+  isActive              Boolean  @default(true) @map("is_active")
+  sortOrder             Int      @default(0) @map("sort_order")
+  estimatedDaysMin      Int?     @map("estimated_days_min")
+  estimatedDaysMax      Int?     @map("estimated_days_max")
+  freeShippingThreshold BigInt?  @map("free_shipping_threshold")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  @@id([tenantId, id])
+  @@unique([tenantId, providerCode, code])
+  @@map("shipping_method_configs")
+}
+
+model Shipment {
+  tenantId       String         @map("tenant_id") @db.Uuid
+  id             String         @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId        String         @map("order_id") @db.Uuid
+  providerCode   String         @map("provider_code")
+  trackingNumber String?        @map("tracking_number")
+  trackingUrl    String?        @map("tracking_url")
+  status         ShipmentStatus @default(PENDING)
+  shippedAt      DateTime?      @map("shipped_at")
+  deliveredAt    DateTime?      @map("delivered_at")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  @@id([tenantId, id])
+  @@index([tenantId, orderId])
+  @@index([tenantId, trackingNumber])
+  @@map("shipments")
+}
+
+// ----------- Tenant settings (FSD 4.3 + branding) ----------------------------
+
+model TenantSettings {
+  tenantId        String   @id @map("tenant_id") @db.Uuid
+  storeName       String   @map("store_name")
+  storeEmail      String   @map("store_email")
+  storePhone      String?  @map("store_phone")
+  storeAddress    Json?    @map("store_address")
+  currency        String   @default("TRY") @db.VarChar(3)
+  defaultLanguage String   @default("tr") @map("default_language") @db.VarChar(10)
+  timezone        String   @default("Europe/Istanbul")
+  weightUnit      String   @default("kg") @map("weight_unit")
+  dimensionUnit   String   @default("cm") @map("dimension_unit")
+  kvkkContact     String?  @map("kvkk_contact")
+  taxNumber       String?  @map("tax_number")
+  legalName       String?  @map("legal_name")
+  logoMediaId     String?  @map("logo_media_id") @db.Uuid
+  faviconMediaId  String?  @map("favicon_media_id") @db.Uuid
+  primaryColor    String?  @default("#0ea5e9") @map("primary_color")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("tenant_settings")
 }

@@ -11,3 +11,5 @@ export * from './media';
 export * from './cms';
 export * from './seo';
 export * from './i18n';
+export * from './providers';
+export * from './tenant-settings';

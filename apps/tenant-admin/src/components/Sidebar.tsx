@@ -6,6 +6,7 @@ import clsx from 'clsx';
 import {
   BarChart3,
   Box,
+  CreditCard,
   FileText,
   Globe,
   Image as ImageIcon,
@@ -18,7 +19,9 @@ import {
   Search,
   Settings,
   ShoppingCart,
+  Store,
   Tag,
+  Truck,
   Users,
   Webhook,
   X,
@@ -47,7 +50,10 @@ const NAV: NavItem[] = [
   { href: '/settings/languages', label: 'Diller', icon: Languages },
   { href: '/settings/translations', label: 'Çeviriler', icon: Languages },
   { href: '/webhooks', label: 'Webhookslar', icon: Webhook },
-  { href: '/settings', label: 'Ayarlar', icon: Settings },
+  { href: '/settings/general', label: 'Mağaza Ayarları', icon: Store },
+  { href: '/settings/payment-methods', label: 'Ödeme Yöntemleri', icon: CreditCard },
+  { href: '/settings/shipping', label: 'Kargo Ayarları', icon: Truck },
+  { href: '/settings', label: 'Diğer Ayarlar', icon: Settings },
 ];
 
 export function Sidebar({

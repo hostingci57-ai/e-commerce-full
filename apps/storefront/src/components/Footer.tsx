@@ -3,13 +3,27 @@ import { api } from '@/lib/api';
 import { getTenantSlug } from '@/lib/tenant-context';
 import { getString } from '@/lib/i18n';
 
+interface FooterProps {
+  storeName?: string;
+  storeEmail?: string;
+  storePhone?: string | null;
+  kvkkContact?: string | null;
+  legalName?: string | null;
+}
+
 /**
  * Footer is a Server Component so we can SSR the CMS-driven columns.
- * - Column "Yasal": CMS pages flagged showInFooter=true, ordered by sortOrder
+ * - Column "Yasal": CMS pages flagged showInFooter=true, with KVKK fallback links
  * - Column "Magaza": static links (products + categories)
  * - Column "Hesap": auth / account links
  */
-export async function Footer() {
+export async function Footer({
+  storeName = 'ECF Shop',
+  storeEmail,
+  storePhone,
+  kvkkContact,
+  legalName,
+}: FooterProps = {}) {
   const tenantSlug = await getTenantSlug();
 
   const [pages, label] = await Promise.all([
@@ -34,10 +48,24 @@ export async function Footer() {
     <footer className="mt-16 border-t border-slate-200 bg-slate-50">
       <div className="container grid grid-cols-2 gap-8 py-10 text-sm md:grid-cols-4">
         <div>
-          <h4 className="mb-3 font-semibold text-slate-900">ECF Shop</h4>
+          <h4 className="mb-3 font-semibold text-slate-900">{storeName}</h4>
           <p className="text-slate-600">
             Çok kiracılı e-ticaret platformu. Basit, hızlı, güvenli.
           </p>
+          {storeEmail ? (
+            <p className="mt-2 text-slate-600">
+              <a href={`mailto:${storeEmail}`} className="hover:text-brand-700">
+                {storeEmail}
+              </a>
+            </p>
+          ) : null}
+          {storePhone ? (
+            <p className="text-slate-600">
+              <a href={`tel:${storePhone}`} className="hover:text-brand-700">
+                {storePhone}
+              </a>
+            </p>
+          ) : null}
         </div>
         <div>
           <h4 className="mb-3 font-semibold text-slate-900">Mağaza</h4>
@@ -70,14 +98,19 @@ export async function Footer() {
                   <Link href={`/p/${p.slug}`}>{p.title}</Link>
                 </li>
               ))
-            ) : (
-              <li className="text-slate-400">—</li>
-            )}
+            ) : null}
+            {kvkkContact ? (
+              <li>
+                <a href={`mailto:${kvkkContact}`} className="hover:text-brand-700">
+                  KVKK: {kvkkContact}
+                </a>
+              </li>
+            ) : null}
           </ul>
         </div>
       </div>
       <div className="border-t border-slate-200 py-4 text-center text-xs text-slate-500">
-        (c) {new Date().getFullYear()} ECF Shop
+        (c) {new Date().getFullYear()} {legalName ?? storeName}
       </div>
     </footer>
   );

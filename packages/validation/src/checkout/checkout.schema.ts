@@ -32,24 +32,42 @@ export const StartCheckoutSchema = z.object({
 });
 export type StartCheckoutInput = z.infer<typeof StartCheckoutSchema>;
 
-/** MVP: fixed shipping catalogue. */
+/** Legacy fixed shipping catalogue — still accepted by the v1 endpoint for backwards compatibility. */
 export const ShippingMethodEnum = z.enum(['standard', 'express']);
 export type ShippingMethod = z.infer<typeof ShippingMethodEnum>;
 
-export const SetShippingSchema = z.object({
-  method: ShippingMethodEnum,
-});
+/**
+ * Provider-aware shipping selection. `method` (legacy) still works — when
+ * supplied it is interpreted as flat_rate/<method>. New clients should send
+ * `providerCode` + `rateCode`.
+ */
+export const SetShippingSchema = z
+  .object({
+    method: ShippingMethodEnum.optional(),
+    providerCode: z.string().trim().min(1).max(64).optional(),
+    rateCode: z.string().trim().min(1).max(64).optional(),
+  })
+  .refine(
+    (v) => v.method || (v.providerCode && v.rateCode),
+    'Provide either method (legacy) or providerCode+rateCode',
+  );
 export type SetShippingInput = z.infer<typeof SetShippingSchema>;
 
-/** MVP: only a stub provider + cash-on-delivery are acknowledged. */
-export const PaymentMethodEnum = z.enum(['cod', 'stub_card']);
+/** Legacy method enum kept for compat — new code should use providerCode. */
+export const PaymentMethodEnum = z.enum(['cod', 'stub_card', 'bank_transfer', 'manual']);
 export type PaymentMethod = z.infer<typeof PaymentMethodEnum>;
 
-export const SetPaymentSchema = z.object({
-  method: PaymentMethodEnum,
-  /** Opaque token from stub card form — never validated, stored as-is. */
-  stubToken: z.string().trim().max(200).optional(),
-});
+export const SetPaymentSchema = z
+  .object({
+    method: PaymentMethodEnum.optional(),
+    providerCode: z.string().trim().min(1).max(64).optional(),
+    stubToken: z.string().trim().max(200).optional(),
+    returnUrl: z.string().trim().url().max(500).optional(),
+  })
+  .refine(
+    (v) => v.method || v.providerCode,
+    'Provide either method (legacy) or providerCode',
+  );
 export type SetPaymentInput = z.infer<typeof SetPaymentSchema>;
 
 export const CompleteCheckoutSchema = z.object({

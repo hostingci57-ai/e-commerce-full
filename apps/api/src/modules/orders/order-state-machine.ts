@@ -20,7 +20,8 @@ import type { OrderStatus } from '@ecf/db';
  */
 const TRANSITIONS: Record<OrderStatus, readonly OrderStatus[]> = {
   draft: ['pending_payment', 'cancelled'],
-  pending_payment: ['payment_success', 'cancelled'],
+  pending_payment: ['payment_success', 'payment_failed', 'cancelled'],
+  payment_failed: ['pending_payment', 'cancelled'],
   payment_success: ['preparing', 'cancelled', 'refund_requested'],
   preparing: ['shipped', 'cancelled', 'refund_requested'],
   shipped: ['delivered', 'refund_requested'],

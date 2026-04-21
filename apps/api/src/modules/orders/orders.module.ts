@@ -11,9 +11,11 @@ import { JwtGuard } from '../auth/guards/jwt.guard';
 import { AuthModule } from '../auth/auth.module';
 import { CouponsModule } from '../coupons/coupons.module';
 import { RefundsModule } from '../refunds/refunds.module';
+import { PaymentsModule } from '../payments/payments.module';
+import { ApiShippingModule } from '../shipping/shipping.module';
 
 @Module({
-  imports: [AuthModule, CouponsModule, RefundsModule],
+  imports: [AuthModule, CouponsModule, RefundsModule, PaymentsModule, ApiShippingModule],
   providers: [
     OrdersService,
     DraftOrdersService,

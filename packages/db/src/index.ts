@@ -23,6 +23,11 @@ export type {
   CouponRedemption,
   RefundRequest,
   Refund,
+  PaymentMethodConfig,
+  Payment,
+  ShippingMethodConfig,
+  Shipment,
+  TenantSettings,
   TenantStatus,
   ProductStatus,
   OrderStatus,
@@ -36,4 +41,6 @@ export type {
   ProcessedEvent,
   WebhookSubscription,
   WebhookDelivery,
+  PaymentStatus,
+  ShipmentStatus,
 } from '@prisma/client';

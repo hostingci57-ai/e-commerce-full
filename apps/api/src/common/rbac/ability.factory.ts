@@ -37,7 +37,10 @@ export type Subject =
   | 'SeoSetting'
   | 'Language'
   | 'TenantLanguage'
-  | 'UiStringBundle';
+  | 'UiStringBundle'
+  | 'Settings'
+  | 'Payment'
+  | 'Shipment';
 
 export type Action = 'manage' | 'create' | 'read' | 'update' | 'delete' | 'invite';
 export type AppAbility = MongoAbility<[Action, Subject]>;
@@ -124,6 +127,8 @@ export class AbilityFactory {
           can(['read', 'update'], 'SeoSetting');
           can(['read', 'update'], 'TenantLanguage');
           can(['read', 'update'], 'UiStringBundle');
+          can(['create', 'read', 'update'], 'Payment');
+          can(['create', 'read', 'update'], 'Shipment');
           break;
         case 'VIEWER':
           can('read', 'all');

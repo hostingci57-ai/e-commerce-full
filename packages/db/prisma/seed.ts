@@ -238,6 +238,9 @@ async function seedDemoTenant(spec: DemoTenantSpec, plans: Record<string, string
     await seedOrders(tx, tenantId, spec, customerMap);
     await seedCoupons(tx, tenantId, spec);
     await seedCmsAndI18n(tx, tenantId);
+    await seedTenantSettings(tx, tenantId, spec);
+    await seedPaymentMethods(tx, tenantId);
+    await seedShippingMethods(tx, tenantId);
   });
 
   console.log(`[seed] tenant ${spec.subdomain} complete`);
@@ -790,6 +793,141 @@ async function seedCmsAndI18n(tx: LocalTx, tenantId: string): Promise<void> {
   }
 
   console.log(`[seed]   cms/i18n defaults ok for ${tenantId}`);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Tenant settings + provider configs                                          */
+/* -------------------------------------------------------------------------- */
+
+async function seedTenantSettings(
+  tx: LocalTx,
+  tenantId: string,
+  spec: DemoTenantSpec,
+): Promise<void> {
+  await tx.tenantSettings.upsert({
+    where: { tenantId },
+    update: {
+      storeName: spec.name,
+      storeEmail: spec.ownerEmail,
+      currency: spec.currency,
+    },
+    create: {
+      tenantId,
+      storeName: spec.name,
+      storeEmail: spec.ownerEmail,
+      currency: spec.currency,
+      defaultLanguage: 'tr',
+      timezone: 'Europe/Istanbul',
+      primaryColor: '#0ea5e9',
+    },
+  });
+  console.log('[seed]   tenantSettings ok');
+}
+
+async function seedPaymentMethods(tx: LocalTx, tenantId: string): Promise<void> {
+  const methods = [
+    {
+      providerCode: 'cod',
+      displayName: 'Kapıda Ödeme',
+      description: 'Siparişinizi teslim alırken ödersiniz.',
+      sortOrder: 0,
+    },
+    {
+      providerCode: 'bank_transfer',
+      displayName: 'Banka Havalesi / EFT',
+      description: 'IBAN ile ödeme yapıp admin onayı sonrası siparişiniz hazırlanır.',
+      config: {
+        iban: 'TR00 0000 0000 0000 0000 0000 00',
+        accountName: 'Demo Mağaza A.Ş.',
+        bank: 'Demo Bank',
+      },
+      sortOrder: 1,
+    },
+    {
+      providerCode: 'stub_card',
+      displayName: 'Kredi Kartı',
+      description: 'Simülasyon ödeme — test için.',
+      sortOrder: 2,
+    },
+  ];
+  for (const m of methods) {
+    await tx.paymentMethodConfig.upsert({
+      where: { tenantId_providerCode: { tenantId, providerCode: m.providerCode } },
+      update: {},
+      create: {
+        tenantId,
+        providerCode: m.providerCode,
+        displayName: m.displayName,
+        description: m.description,
+        config: (m.config ?? {}) as Prisma.InputJsonValue,
+        isActive: true,
+        sortOrder: m.sortOrder,
+      },
+    });
+  }
+  console.log(`[seed]   paymentMethodConfigs (${methods.length}) ok`);
+}
+
+async function seedShippingMethods(tx: LocalTx, tenantId: string): Promise<void> {
+  const methods = [
+    {
+      providerCode: 'flat_rate',
+      code: 'standard',
+      displayName: 'Standart Kargo',
+      description: '2-4 iş günü içinde teslim.',
+      config: { priceMinor: '5000' },
+      estimatedDaysMin: 2,
+      estimatedDaysMax: 4,
+      sortOrder: 0,
+    },
+    {
+      providerCode: 'flat_rate',
+      code: 'express',
+      displayName: 'Ekspres Kargo',
+      description: 'Ertesi gün teslim.',
+      config: { priceMinor: '12000' },
+      estimatedDaysMin: 1,
+      estimatedDaysMax: 1,
+      sortOrder: 1,
+    },
+    {
+      providerCode: 'free_shipping',
+      code: 'free_500',
+      displayName: '₺500 üzeri ücretsiz kargo',
+      description: 'Sepet tutarı ₺500 ve üzerinde ücretsiz kargo.',
+      config: {},
+      freeShippingThreshold: BigInt(50_000),
+      estimatedDaysMin: 2,
+      estimatedDaysMax: 5,
+      sortOrder: 2,
+    },
+  ];
+  for (const m of methods) {
+    await tx.shippingMethodConfig.upsert({
+      where: {
+        tenantId_providerCode_code: {
+          tenantId,
+          providerCode: m.providerCode,
+          code: m.code,
+        },
+      },
+      update: {},
+      create: {
+        tenantId,
+        providerCode: m.providerCode,
+        code: m.code,
+        displayName: m.displayName,
+        description: m.description,
+        config: m.config as Prisma.InputJsonValue,
+        isActive: true,
+        sortOrder: m.sortOrder,
+        estimatedDaysMin: m.estimatedDaysMin,
+        estimatedDaysMax: m.estimatedDaysMax,
+        freeShippingThreshold: m.freeShippingThreshold ?? null,
+      },
+    });
+  }
+  console.log(`[seed]   shippingMethodConfigs (${methods.length}) ok`);
 }
 
 /* -------------------------------------------------------------------------- */

@@ -19,7 +19,12 @@ function toHref(item: MenuItem): string {
   return item.target.startsWith('/') ? item.target : `/${item.target}`;
 }
 
-export function Header() {
+interface HeaderProps {
+  storeName?: string;
+  primaryColor?: string | null;
+}
+
+export function Header({ storeName = 'ECF Shop', primaryColor }: HeaderProps) {
   const { itemCount } = useCart();
   const { t } = useI18n();
   const [menu, setMenu] = useState<MenuItem[]>([]);
@@ -43,8 +48,11 @@ export function Header() {
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
       <div className="container flex items-center justify-between py-3">
         <Link href="/" className="flex items-center gap-2">
-          <span className="text-lg font-bold tracking-tight text-brand-700">
-            ECF Shop
+          <span
+            className="text-lg font-bold tracking-tight"
+            style={primaryColor ? { color: primaryColor } : undefined}
+          >
+            {storeName}
           </span>
         </Link>
 
@@ -82,7 +90,10 @@ export function Header() {
           >
             {t('nav.cart')}
             {itemCount > 0 ? (
-              <span className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-600 px-1 text-xs font-semibold text-white">
+              <span
+                className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-semibold text-white"
+                style={{ background: primaryColor ?? 'rgb(37 99 235)' }}
+              >
                 {itemCount}
               </span>
             ) : null}

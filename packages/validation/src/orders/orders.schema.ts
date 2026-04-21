@@ -8,6 +8,7 @@ export const OrderStatusEnum = z.enum([
   'draft',
   'pending_payment',
   'payment_success',
+  'payment_failed',
   'preparing',
   'shipped',
   'delivered',

@@ -17,9 +17,9 @@ import type { OrderStatus } from '@ecf/db';
  */
 describe('OrderStateMachine', () => {
   describe('allowedFrom — exact transition map', () => {
-    it('pending_payment → [payment_success, cancelled]', () => {
+    it('pending_payment → [payment_success, payment_failed, cancelled]', () => {
       expect([...OrderStateMachine.allowedFrom('pending_payment')].sort()).toEqual(
-        ['cancelled', 'payment_success'].sort(),
+        ['cancelled', 'payment_failed', 'payment_success'].sort(),
       );
     });
 
@@ -47,9 +47,9 @@ describe('OrderStateMachine', () => {
       );
     });
 
-    it('refund_requested → [refunded, cancelled]', () => {
+    it('refund_requested → [refunded, partial_refunded, cancelled]', () => {
       expect([...OrderStateMachine.allowedFrom('refund_requested')].sort()).toEqual(
-        ['cancelled', 'refunded'].sort(),
+        ['cancelled', 'partial_refunded', 'refunded'].sort(),
       );
     });
   });

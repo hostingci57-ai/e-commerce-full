@@ -17,6 +17,9 @@ import { InventoryModule } from './modules/inventory/inventory.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { CouponsModule } from './modules/coupons/coupons.module';
 import { RefundsModule } from './modules/refunds/refunds.module';
+import { PaymentsModule } from './modules/payments/payments.module';
+import { ApiShippingModule } from './modules/shipping/shipping.module';
+import { TenantSettingsModule } from './modules/tenant-settings/tenant-settings.module';
 
 @Module({
   imports: [
@@ -41,6 +44,9 @@ import { RefundsModule } from './modules/refunds/refunds.module';
     OrdersModule,
     CheckoutModule,
     RefundsModule,
+    PaymentsModule,
+    ApiShippingModule,
+    TenantSettingsModule,
   ],
 })
 export class AppModule {}

@@ -1,5 +1,4 @@
 import type { CartLine } from '../cart/cart.types';
-import type { PaymentMethod, ShippingMethod } from '@ecf/validation';
 
 /** Frozen snapshot of the cart taken at /checkout/start. */
 export interface CheckoutCartSnapshot {
@@ -26,17 +25,23 @@ export interface CheckoutAddress {
 
 export type CheckoutStep = 'address' | 'shipping' | 'payment' | 'ready' | 'completed';
 
+/** Shipping choice stored in the session — abstract over providers. */
 export interface CheckoutShipping {
-  method: ShippingMethod;
+  providerCode: string;
+  rateCode: string;
+  name: string;
   priceMinor: string;
 }
 
+/** Payment choice stored in the session — abstract over providers. */
 export interface CheckoutPayment {
-  method: PaymentMethod;
-  stubToken: string | null;
+  providerCode: string;
   providerRef: string | null;
-  /** pending_stub | paid_stub — reflects the mock provider state. */
-  status: 'pending_stub' | 'paid_stub';
+  token: string | null;
+  returnUrl: string | null;
+  /** Status mirrored from the provider init result. */
+  status: 'pending' | 'requires_redirect' | 'captured' | 'failed';
+  redirectUrl: string | null;
 }
 
 export interface CheckoutSession {

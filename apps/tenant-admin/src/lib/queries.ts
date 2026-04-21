@@ -296,3 +296,142 @@ export function updateDraftOrder(
 export function convertDraftOrder(id: string, body: { notifyCustomer?: boolean } = {}) {
   return api.post<DraftOrderListItem>(`/orders/draft/${id}/convert`, body);
 }
+
+// ----- Payment / Shipping providers + Tenant settings (Faz 7c) -------------
+
+export interface PaymentMethodConfig {
+  id: string;
+  providerCode: string;
+  displayName: string;
+  description: string | null;
+  config: Record<string, unknown>;
+  isActive: boolean;
+  sortOrder: number;
+  minAmount: string | null;
+  maxAmount: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ProviderCatalogueEntry {
+  code: string;
+  displayName: string;
+  isActive: boolean;
+}
+
+export function listPaymentProviders() {
+  return api.get<ProviderCatalogueEntry[]>('/tenant/payment-methods/providers');
+}
+export function listPaymentMethodConfigs() {
+  return api.get<PaymentMethodConfig[]>('/tenant/payment-methods');
+}
+export function upsertPaymentMethodConfig(body: {
+  providerCode: string;
+  displayName: string;
+  description?: string | null;
+  config?: Record<string, unknown>;
+  isActive?: boolean;
+  sortOrder?: number;
+  minAmount?: string | number | null;
+  maxAmount?: string | number | null;
+}) {
+  return api.post<PaymentMethodConfig>('/tenant/payment-methods', body);
+}
+export function updatePaymentMethodConfig(
+  id: string,
+  body: Partial<Omit<PaymentMethodConfig, 'id' | 'providerCode'>>,
+) {
+  return api.patch<PaymentMethodConfig>(`/tenant/payment-methods/${id}`, body);
+}
+export function deletePaymentMethodConfig(id: string) {
+  return api.delete<{ ok: true }>(`/tenant/payment-methods/${id}`);
+}
+
+export interface ShippingMethodConfig {
+  id: string;
+  providerCode: string;
+  code: string;
+  displayName: string;
+  description: string | null;
+  config: Record<string, unknown>;
+  isActive: boolean;
+  sortOrder: number;
+  estimatedDaysMin: number | null;
+  estimatedDaysMax: number | null;
+  freeShippingThreshold: string | null;
+}
+
+export function listShippingProviders() {
+  return api.get<ProviderCatalogueEntry[]>('/tenant/shipping-methods/providers');
+}
+export function listShippingMethodConfigs() {
+  return api.get<ShippingMethodConfig[]>('/tenant/shipping-methods');
+}
+export function upsertShippingMethodConfig(body: {
+  providerCode: string;
+  code: string;
+  displayName: string;
+  description?: string | null;
+  config?: Record<string, unknown>;
+  isActive?: boolean;
+  sortOrder?: number;
+  estimatedDaysMin?: number | null;
+  estimatedDaysMax?: number | null;
+  freeShippingThreshold?: string | number | null;
+}) {
+  return api.post<ShippingMethodConfig>('/tenant/shipping-methods', body);
+}
+export function updateShippingMethodConfig(
+  id: string,
+  body: Partial<Omit<ShippingMethodConfig, 'id' | 'providerCode' | 'code'>>,
+) {
+  return api.patch<ShippingMethodConfig>(`/tenant/shipping-methods/${id}`, body);
+}
+export function deleteShippingMethodConfig(id: string) {
+  return api.delete<{ ok: true }>(`/tenant/shipping-methods/${id}`);
+}
+
+export interface TenantSettings {
+  tenantId: string;
+  storeName: string;
+  storeEmail: string;
+  storePhone: string | null;
+  storeAddress: Record<string, unknown> | null;
+  currency: string;
+  defaultLanguage: string;
+  timezone: string;
+  weightUnit: string;
+  dimensionUnit: string;
+  kvkkContact: string | null;
+  taxNumber: string | null;
+  legalName: string | null;
+  logoMediaId: string | null;
+  faviconMediaId: string | null;
+  primaryColor: string | null;
+  updatedAt?: string;
+}
+
+export function getTenantSettings() {
+  return api.get<TenantSettings>('/tenant/settings');
+}
+export function updateTenantSettings(body: Partial<TenantSettings>) {
+  return api.patch<TenantSettings>('/tenant/settings', body);
+}
+
+export function capturePayment(orderId: string) {
+  return api.post<{ payment: { id: string; status: string } }>(
+    `/orders/${orderId}/payment/capture`,
+  );
+}
+
+export function createOrderShipment(
+  orderId: string,
+  body: {
+    providerCode: string;
+    trackingNumber?: string;
+    trackingUrl?: string;
+    note?: string;
+  },
+) {
+  return api.post(`/orders/${orderId}/shipments`, body);
+}

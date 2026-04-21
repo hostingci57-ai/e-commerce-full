@@ -7,9 +7,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import { Redis } from 'ioredis';
 import {
-  SHIPPING_CATALOGUE,
   type CheckoutAddressInput,
-  type PaymentMethod,
   type SetPaymentInput,
   type SetShippingInput,
   type StartCheckoutInput,
@@ -20,10 +18,18 @@ import { TenantContextService } from '../../common/tenancy/tenant-context.servic
 import { CartService, type CartOwner } from '../cart/cart.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { OrdersService } from '../orders/orders.service';
+import { PaymentsService } from '../payments/payments.service';
+import { ShippingRegistryService } from '../../common/shipping/shipping-registry.service';
 import type { CheckoutSession, CheckoutStep } from './checkout.types';
 
 /** Checkout sessions last 15 min — same TTL as the inventory reservation. */
 const CHECKOUT_TTL_SECONDS = 15 * 60;
+
+/** Legacy method → (providerCode, rateCode) mapping for old storefronts. */
+const LEGACY_SHIPPING_MAP: Record<string, { providerCode: string; rateCode: string }> = {
+  standard: { providerCode: 'flat_rate', rateCode: 'standard' },
+  express: { providerCode: 'flat_rate', rateCode: 'express' },
+};
 
 function sessionKey(tenantId: string, token: string): string {
   return `checkout:t:${tenantId}:${token}`;
@@ -37,17 +43,14 @@ export class CheckoutService {
     private readonly cart: CartService,
     private readonly inventory: InventoryService,
     private readonly orders: OrdersService,
+    private readonly payments: PaymentsService,
+    private readonly shippingRegistry: ShippingRegistryService,
   ) {}
 
   // -------------------------------------------------------------------------
   // Start
   // -------------------------------------------------------------------------
 
-  /**
-   * Lock the current cart into a checkout session + reserve inventory for 15m.
-   * If the cart is empty / out of stock this throws — the storefront handles
-   * both cases at the drawer level.
-   */
   async start(
     owner: CartOwner,
     input: StartCheckoutInput,
@@ -73,8 +76,6 @@ export class CheckoutService {
       15,
     );
 
-    // Resolve an applied coupon (at most one in this release) to its row so
-    // complete() can redeem without a second lookup.
     const appliedCoupon = cart.coupons[0];
     let couponId: string | null = null;
     if (appliedCoupon) {
@@ -157,6 +158,34 @@ export class CheckoutService {
     return session;
   }
 
+  /** List shipping rates available for the current session's address + cart. */
+  async getShippingRates(token: string) {
+    const session = await this.requireSession(token);
+    if (!session.shippingAddress) {
+      throw new BadRequestException({
+        code: 'address_required',
+        message: 'Set a shipping address first',
+      });
+    }
+    const rates = await this.shippingRegistry.listAvailable({
+      tenantId: session.tenantId,
+      destinationAddress: session.shippingAddress,
+      subtotalMinor: BigInt(session.cart.subtotalMinor),
+      currency: session.cart.currency,
+      packages: [],
+    });
+    return rates.map((r) => ({
+      providerCode: r.providerCode,
+      code: r.code,
+      name: r.name,
+      priceMinor: r.priceMinor.toString(),
+      currency: r.currency,
+      estimatedDays: r.estimatedDays ?? null,
+      description: r.description ?? null,
+      freeShippingApplied: r.freeShippingApplied ?? false,
+    }));
+  }
+
   async setShipping(
     token: string,
     input: SetShippingInput,
@@ -168,10 +197,46 @@ export class CheckoutService {
         message: 'Set a shipping address before choosing a shipping method',
       });
     }
-    const option = SHIPPING_CATALOGUE[input.method];
+
+    // Resolve (providerCode, rateCode) from legacy `method` or explicit input.
+    let providerCode = input.providerCode;
+    let rateCode = input.rateCode;
+    if (!providerCode || !rateCode) {
+      const legacy = input.method ? LEGACY_SHIPPING_MAP[input.method] : null;
+      if (legacy) {
+        providerCode = legacy.providerCode;
+        rateCode = legacy.rateCode;
+      }
+    }
+    if (!providerCode || !rateCode) {
+      throw new BadRequestException({
+        code: 'shipping_invalid',
+        message: 'Provide either method (legacy) or providerCode+rateCode',
+      });
+    }
+
+    // Apply free-shipping coupon override (FREE_SHIPPING coupons zero the price).
+    const hasFreeShippingCoupon = session.cart.couponCode
+      ? await this.isFreeShippingCoupon(session.tenantId, session.cart.couponCode)
+      : false;
+
+    const rate = await this.shippingRegistry.requireRate(
+      session.tenantId,
+      providerCode,
+      rateCode,
+      {
+        destinationAddress: session.shippingAddress,
+        subtotalMinor: BigInt(session.cart.subtotalMinor),
+        currency: session.cart.currency,
+      },
+    );
+    const priceMinor = hasFreeShippingCoupon ? 0n : rate.priceMinor;
+
     session.shipping = {
-      method: input.method,
-      priceMinor: option.priceMinor.toString(),
+      providerCode: rate.providerCode,
+      rateCode: rate.code,
+      name: rate.name,
+      priceMinor: priceMinor.toString(),
     };
     session.step = this.advance(session.step, 'payment');
     await this.save(session);
@@ -189,11 +254,20 @@ export class CheckoutService {
         message: 'Select a shipping method before payment',
       });
     }
+    const providerCode = input.providerCode ?? input.method;
+    if (!providerCode) {
+      throw new BadRequestException({
+        code: 'payment_invalid',
+        message: 'Provide either method (legacy) or providerCode',
+      });
+    }
     session.payment = {
-      method: input.method as PaymentMethod,
-      stubToken: input.stubToken ?? null,
-      providerRef: `stub_${randomUUID()}`,
-      status: 'pending_stub',
+      providerCode,
+      providerRef: null,
+      token: input.stubToken ?? null,
+      returnUrl: input.returnUrl ?? null,
+      status: 'pending',
+      redirectUrl: null,
     };
     session.step = this.advance(session.step, 'ready');
     await this.save(session);
@@ -201,10 +275,16 @@ export class CheckoutService {
   }
 
   // -------------------------------------------------------------------------
-  // Complete — creates Order, confirms inventory, clears cart.
+  // Complete — creates Order, initializes Payment via provider, confirms inventory.
   // -------------------------------------------------------------------------
 
-  async complete(token: string): Promise<{ orderId: string; orderNumber: string; status: string }> {
+  async complete(token: string): Promise<{
+    orderId: string;
+    orderNumber: string;
+    status: string;
+    paymentStatus: string;
+    redirectUrl?: string;
+  }> {
     const session = await this.requireSession(token);
     if (!session.shipping || !session.shippingAddress || !session.payment) {
       throw new BadRequestException({
@@ -225,12 +305,8 @@ export class CheckoutService {
     const shippingMinor = BigInt(session.shipping.priceMinor);
     const total = subtotal - discount + shippingMinor;
 
-    // Payment semantics:
-    //   stub_card → auto-succeeds, order.status = payment_success
-    //   cod       → pending_payment, admin flips to paid when cash collected
-    const initialStatus = session.payment.method === 'stub_card' ? 'payment_success' : 'pending_payment';
-    if (session.payment.method === 'stub_card') session.payment.status = 'paid_stub';
-
+    // Create the order in pending_payment state; the provider result below
+    // transitions it to payment_success or payment_failed.
     const order = await this.orders.create(
       {
         customerId: session.customerId,
@@ -241,8 +317,8 @@ export class CheckoutService {
         discountMinor: discount,
         taxMinor: 0n,
         totalMinor: total,
-        paymentProvider: session.payment.method === 'cod' ? 'cod' : 'stub',
-        paymentRef: session.payment.providerRef,
+        paymentProvider: session.payment.providerCode,
+        paymentRef: null,
         couponCode: cart.couponCode,
         couponId: cart.couponId,
         lines: cart.items.map((i) => ({
@@ -254,15 +330,57 @@ export class CheckoutService {
           quantity: i.quantity,
         })),
       },
-      initialStatus,
+      'pending_payment',
     );
 
-    // Inventory confirm/release MUST happen after the order is created — if
-    // confirm fails mid-way we surface a 500 and the inventory job will sweep
-    // the reservation on TTL expiry. We never leave reservations dangling.
+    // Fire the provider — create Payment row + drive init().
+    let initResult;
+    try {
+      const res = await this.payments.initForOrder({
+        tenantId: session.tenantId,
+        orderId: order.id,
+        providerCode: session.payment.providerCode,
+        amount: total,
+        currency: cart.currency,
+        customer: {
+          id: session.customerId,
+          email: session.shippingAddress.email,
+          fullName: session.shippingAddress.fullName,
+        },
+        returnUrl: session.payment.returnUrl,
+      });
+      initResult = res.initResult;
+      session.payment.providerRef = res.payment.providerRef;
+    } catch (err) {
+      // Leave order in pending_payment; a retry can re-drive payment.
+      throw err;
+    }
+
+    // Transition order based on the provider result.
+    let finalStatus: string = order.status;
+    if (initResult.status === 'captured') {
+      await this.orders.updateStatus(order.id, {
+        to: 'payment_success',
+        note: `Payment captured via ${session.payment.providerCode}`,
+      });
+      finalStatus = 'payment_success';
+    } else if (initResult.status === 'failed') {
+      await this.orders.updateStatus(order.id, {
+        to: 'payment_failed',
+        note: initResult.failureReason ?? 'Payment initialization failed',
+      });
+      finalStatus = 'payment_failed';
+    } else {
+      // pending / requires_redirect — order stays in pending_payment.
+    }
+
+    session.payment.status = initResult.status;
+    session.payment.redirectUrl = initResult.redirectUrl ?? null;
+
+    // Inventory confirm/release AFTER order is created.
     await this.inventory.confirm(token, order.id);
 
-    // Clear cart and mark checkout session completed (kept for 1h for audit).
+    // Clear cart + mark session completed (kept 1h for audit).
     const owner: CartOwner = {
       tenantId: session.tenantId,
       customerId: session.customerId,
@@ -279,7 +397,13 @@ export class CheckoutService {
       60 * 60,
     );
 
-    return { orderId: order.id, orderNumber: order.orderNumber, status: order.status };
+    return {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      status: finalStatus,
+      paymentStatus: initResult.status,
+      redirectUrl: initResult.redirectUrl,
+    };
   }
 
   // -------------------------------------------------------------------------
@@ -288,6 +412,19 @@ export class CheckoutService {
 
   async get(token: string): Promise<CheckoutSession> {
     return this.requireSession(token);
+  }
+
+  private async isFreeShippingCoupon(
+    tenantId: string,
+    code: string,
+  ): Promise<boolean> {
+    const row = await withTenant({ tenantId }, (tx) =>
+      tx.coupon.findUnique({
+        where: { tenantId_code: { tenantId, code } },
+        select: { type: true },
+      }),
+    );
+    return row?.type === 'FREE_SHIPPING';
   }
 
   private async requireSession(token: string): Promise<CheckoutSession> {
@@ -327,7 +464,6 @@ export class CheckoutService {
     }
   }
 
-  /** Move the step forward only — never regress. */
   private advance(current: CheckoutStep, target: CheckoutStep): CheckoutStep {
     const order: CheckoutStep[] = ['address', 'shipping', 'payment', 'ready', 'completed'];
     return order.indexOf(target) > order.indexOf(current) ? target : current;

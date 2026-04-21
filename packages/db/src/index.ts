@@ -23,6 +23,11 @@ export type {
   CouponRedemption,
   RefundRequest,
   Refund,
+  PaymentMethodConfig,
+  Payment,
+  ShippingMethodConfig,
+  Shipment,
+  TenantSettings,
   TenantStatus,
   ProductStatus,
   OrderStatus,
@@ -31,4 +36,6 @@ export type {
   CouponType,
   RefundReasonCategory,
   RefundRequestStatus,
+  PaymentStatus,
+  ShipmentStatus,
 } from '@prisma/client';

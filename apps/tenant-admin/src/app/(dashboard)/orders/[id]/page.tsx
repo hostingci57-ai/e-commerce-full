@@ -9,8 +9,11 @@ import { ArrowLeft, Ban, Check } from 'lucide-react';
 import {
   approveRefundRequest,
   cancelOrder,
+  capturePayment,
+  createOrderShipment,
   getOrder,
   listRefundRequests,
+  listShippingProviders,
   rejectRefundRequest,
   updateOrderStatus,
   type RefundRequestItem,
@@ -21,6 +24,7 @@ import {
   CardBody,
   CardHeader,
   Dialog,
+  Input,
   Select,
   Textarea,
 } from '@/components/ui';
@@ -112,10 +116,46 @@ export default function OrderDetailPage() {
   const [statusOpen, setStatusOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState<{ id: string } | null>(null);
+  const [shipmentOpen, setShipmentOpen] = useState(false);
   const [nextStatus, setNextStatus] = useState<OrderStatus | ''>('');
   const [note, setNote] = useState('');
   const [reason, setReason] = useState('');
   const [rejectReason, setRejectReason] = useState('');
+  const [shipProvider, setShipProvider] = useState('flat_rate');
+  const [trackingNumber, setTrackingNumber] = useState('');
+  const [trackingUrl, setTrackingUrl] = useState('');
+
+  const shippingProvidersQ = useQuery({
+    queryKey: ['shipping-providers'],
+    queryFn: listShippingProviders,
+    staleTime: 60_000,
+  });
+
+  const captureMut = useMutation({
+    mutationFn: () => capturePayment(id),
+    onSuccess: () => {
+      toast.success('Ödeme onaylandı');
+      qc.invalidateQueries({ queryKey: ['order', id] });
+    },
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : 'Onaylanamadı'),
+  });
+
+  const shipmentMut = useMutation({
+    mutationFn: () =>
+      createOrderShipment(id, {
+        providerCode: shipProvider,
+        trackingNumber: trackingNumber || undefined,
+        trackingUrl: trackingUrl || undefined,
+      }),
+    onSuccess: () => {
+      toast.success('Kargo oluşturuldu');
+      qc.invalidateQueries({ queryKey: ['order', id] });
+      setShipmentOpen(false);
+      setTrackingNumber('');
+      setTrackingUrl('');
+    },
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : 'Kargo oluşturulamadı'),
+  });
 
   const statusMut = useMutation({
     mutationFn: () =>
@@ -197,6 +237,22 @@ export default function OrderDetailPage() {
           </div>
         </div>
         <div className="flex gap-2">
+          {o.status === 'pending_payment' ? (
+            <Button
+              variant="outline"
+              loading={captureMut.isPending}
+              onClick={() => {
+                if (confirm('Ödemeyi onayla?')) captureMut.mutate();
+              }}
+            >
+              Ödemeyi Onayla
+            </Button>
+          ) : null}
+          {(o.status === 'payment_success' || o.status === 'preparing') ? (
+            <Button variant="outline" onClick={() => setShipmentOpen(true)}>
+              Kargo Oluştur
+            </Button>
+          ) : null}
           <Button
             variant="outline"
             disabled={terminal || transitions.length === 0}
@@ -429,6 +485,48 @@ export default function OrderDetailPage() {
             placeholder="Müşterinin isteği, stokta yok, vs."
           />
         </FormField>
+      </Dialog>
+
+      <Dialog
+        open={shipmentOpen}
+        onClose={() => setShipmentOpen(false)}
+        title="Kargo Oluştur"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setShipmentOpen(false)}>
+              Vazgeç
+            </Button>
+            <Button loading={shipmentMut.isPending} onClick={() => shipmentMut.mutate()}>
+              Oluştur
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <FormField label="Sağlayıcı" required>
+            <Select value={shipProvider} onChange={(e) => setShipProvider(e.target.value)}>
+              {(shippingProvidersQ.data ?? []).map((p) => (
+                <option key={p.code} value={p.code}>
+                  {p.displayName}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+          <FormField label="Takip Numarası" hint="Manuel kargolarda elle girin">
+            <Input
+              value={trackingNumber}
+              onChange={(e) => setTrackingNumber(e.target.value)}
+              placeholder="YRT1234567890"
+            />
+          </FormField>
+          <FormField label="Takip URL (opsiyonel)">
+            <Input
+              value={trackingUrl}
+              onChange={(e) => setTrackingUrl(e.target.value)}
+              placeholder="https://kargo.example.com/track/..."
+            />
+          </FormField>
+        </div>
       </Dialog>
 
       <Dialog

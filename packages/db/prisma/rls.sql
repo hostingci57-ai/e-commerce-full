@@ -35,7 +35,12 @@ DECLARE
     'coupons',
     'coupon_redemptions',
     'refund_requests',
-    'refunds'
+    'refunds',
+    'payment_method_configs',
+    'payments',
+    'shipping_method_configs',
+    'shipments',
+    'tenant_settings'
   ];
 BEGIN
   FOREACH t IN ARRAY tenant_tables LOOP
@@ -124,6 +129,26 @@ CREATE POLICY tenant_isolation ON refund_requests
   WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
 
 CREATE POLICY tenant_isolation ON refunds
+  USING      (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+  WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
+
+CREATE POLICY tenant_isolation ON payment_method_configs
+  USING      (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+  WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
+
+CREATE POLICY tenant_isolation ON payments
+  USING      (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+  WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
+
+CREATE POLICY tenant_isolation ON shipping_method_configs
+  USING      (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+  WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
+
+CREATE POLICY tenant_isolation ON shipments
+  USING      (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+  WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
+
+CREATE POLICY tenant_isolation ON tenant_settings
   USING      (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
   WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
 

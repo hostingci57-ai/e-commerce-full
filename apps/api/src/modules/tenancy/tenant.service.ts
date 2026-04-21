@@ -140,6 +140,16 @@ export class TenantService {
       },
     });
 
+    // Default tenant settings row — storefront + admin both assume it exists.
+    // Landlord client bypasses RLS so a plain create is safe.
+    await this.prisma.tenantSettings.create({
+      data: {
+        tenantId: tenant.id,
+        storeName: input.name,
+        storeEmail: input.ownerEmail ?? 'store@example.com',
+      },
+    });
+
     if (ownerUserId) {
       const ownerRole = await this.prisma.role.findFirst({
         where: { code: 'OWNER', tenantId: null },

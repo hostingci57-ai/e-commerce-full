@@ -6,13 +6,16 @@ import clsx from 'clsx';
 import {
   BarChart3,
   Box,
+  CreditCard,
   Layers,
   Package,
   Percent,
   Receipt,
   Settings,
   ShoppingCart,
+  Store,
   Tag,
+  Truck,
   Users,
   X,
 } from 'lucide-react';
@@ -32,7 +35,10 @@ const NAV: NavItem[] = [
   { href: '/orders/draft', label: 'Taslak Siparişler', icon: Receipt },
   { href: '/coupons', label: 'Kuponlar', icon: Percent },
   { href: '/customers', label: 'Müşteriler', icon: Users },
-  { href: '/settings', label: 'Ayarlar', icon: Settings },
+  { href: '/settings/general', label: 'Mağaza Ayarları', icon: Store },
+  { href: '/settings/payment-methods', label: 'Ödeme Yöntemleri', icon: CreditCard },
+  { href: '/settings/shipping', label: 'Kargo Ayarları', icon: Truck },
+  { href: '/settings', label: 'Diğer Ayarlar', icon: Settings },
 ];
 
 export function Sidebar({

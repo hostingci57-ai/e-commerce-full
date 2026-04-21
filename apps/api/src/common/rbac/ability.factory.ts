@@ -28,7 +28,10 @@ export type Subject =
   | 'TenantMember'
   | 'Role'
   | 'Coupon'
-  | 'Refund';
+  | 'Refund'
+  | 'Settings'
+  | 'Payment'
+  | 'Shipment';
 
 export type Action = 'manage' | 'create' | 'read' | 'update' | 'delete' | 'invite';
 export type AppAbility = MongoAbility<[Action, Subject]>;
@@ -109,6 +112,8 @@ export class AbilityFactory {
           can('read', 'Brand');
           can(['create', 'read', 'update', 'delete'], 'Coupon');
           can(['read', 'update'], 'Refund');
+          can(['create', 'read', 'update'], 'Payment');
+          can(['create', 'read', 'update'], 'Shipment');
           break;
         case 'VIEWER':
           can('read', 'all');

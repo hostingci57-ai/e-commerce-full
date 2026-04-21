@@ -93,6 +93,7 @@ Mağaza URL'niz: https://{{subdomain}}.{{baseDomain}}
 
 ECF Ekibi`,
   },
+<<<<<<< HEAD
   'abandoned-cart-recovery': {
     subject: 'Sepetinizde unuttuğunuz ürünler var',
     text: `Merhaba,
@@ -107,6 +108,22 @@ Sepet içeriği:
 Toplam: {{total}}
 
 Stoklar tükenebilir, acele edin!`,
+=======
+  'low-stock-alert': {
+    subject: '{{tenantName}} — Düşük stok uyarısı ({{itemCount}} ürün)',
+    text: `Merhaba,
+
+{{tenantName}} mağazanızda {{itemCount}} ürün düşük stok eşiğine indi veya tükendi.
+
+{{#each items}}
+- {{sku}} — {{productTitle}} · Mevcut: {{available}} / Eşik: {{lowStockThreshold}}
+{{/each}}
+
+Lütfen yönetim panelinden stok seviyelerini güncelleyin:
+{{adminUrl}}/inventory
+
+{{tenantName}}`,
+>>>>>>> feature/inventory-ui-movements
   },
 };
 

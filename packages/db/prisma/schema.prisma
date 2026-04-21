@@ -108,6 +108,16 @@ enum ReviewStatus {
   SPAM
 }
 
+enum InventoryMovementType {
+  ADJUSTMENT       // manual correction (+/-)
+  RESERVATION      // -N (checkout reserve)
+  RELEASE          // +N (cart expired / released)
+  FULFILLMENT      // -N (order paid+shipped, stock from reserved→gone)
+  RETURN           // +N (return received)
+  DAMAGE           // -N
+  INITIAL          // +N (first stock entry)
+}
+
 // =============================================================================
 // GLOBAL (no RLS)
 // =============================================================================
@@ -538,6 +548,50 @@ model InventoryReservation {
   @@index([tenantId, expiresAt])
   @@index([tenantId, variantId])
   @@map("inventory_reservations")
+}
+
+/// Per-variant stock audit trail. Every write to an inventory level
+/// (adjust/reserve/release/fulfill/return/damage/initial) appends one row
+/// of this table so we can reconstruct "why is stock at X now?" forever.
+model InventoryMovement {
+  tenantId    String   @map("tenant_id") @db.Uuid
+  id          String   @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  variantId   String   @map("variant_id") @db.Uuid
+  type        InventoryMovementType
+  /// positive = addition, negative = subtraction
+  quantity    Int
+  /// free-form slug: 'manual_adjustment','order_reserved','order_fulfilled',
+  /// 'cart_released','return','damage','initial','bulk_import'
+  reason      String?
+  /// optional cross-ref to another entity (orderId, returnId, importBatchId,...)
+  reference   String?
+  note        String?
+  createdBy   String?  @map("created_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@id([tenantId, id])
+  @@index([tenantId, variantId, createdAt])
+  @@index([tenantId, type, createdAt])
+  @@map("inventory_movements")
+}
+
+/// Canonical inventory level per (tenant, variant). ProductVariant keeps
+/// `stockOnHand`/`stockReserved` fields for backward compatibility (cart,
+/// checkout, products service read them). InventoryService writes BOTH
+/// tables inside the same SERIALIZABLE tx so they cannot drift.
+model InventoryLevel {
+  tenantId          String   @map("tenant_id") @db.Uuid
+  variantId         String   @map("variant_id") @db.Uuid
+  /// stock actually on hand (physically available, incl. reserved)
+  stockOnHand       Int      @default(0) @map("stock_on_hand")
+  /// stock reserved for open checkouts (15-min TTL)
+  stockReserved     Int      @default(0) @map("stock_reserved")
+  lowStockThreshold Int      @default(5) @map("low_stock_threshold")
+  lastUpdatedAt     DateTime @default(now()) @updatedAt @map("last_updated_at")
+
+  @@id([tenantId, variantId])
+  @@index([tenantId, stockOnHand])
+  @@map("inventory_levels")
 }
 
 model OutboxEvent {

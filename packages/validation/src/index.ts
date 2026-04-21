@@ -15,3 +15,4 @@ export * from './providers';
 export * from './tenant-settings';
 export * from './reviews';
 export * from './wishlist';
+export * from './inventory';

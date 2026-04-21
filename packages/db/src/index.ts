@@ -47,4 +47,7 @@ export type {
   ReviewStatus,
   WishlistItem,
   AbandonedCart,
+  InventoryMovement,
+  InventoryMovementType,
+  InventoryLevel,
 } from '@prisma/client';

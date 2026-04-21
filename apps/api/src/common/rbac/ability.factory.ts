@@ -41,11 +41,15 @@ export type Subject =
   | 'Settings'
   | 'Payment'
   | 'Shipment'
+<<<<<<< HEAD
   | 'Analytics'
   | 'Report'
   | 'ProductReview'
   | 'WishlistItem'
   | 'AbandonedCart';
+=======
+  | 'Inventory';
+>>>>>>> feature/inventory-ui-movements
 
 export type Action = 'manage' | 'create' | 'read' | 'update' | 'delete' | 'invite';
 export type AppAbility = MongoAbility<[Action, Subject]>;
@@ -125,6 +129,7 @@ export class AbilityFactory {
           can(['create', 'read', 'update', 'delete'], 'Category');
           can(['create', 'read', 'update', 'delete'], 'Brand');
           can(['create', 'read', 'update', 'delete'], 'MediaAsset');
+          can('manage', 'Inventory');
           can('read', 'Order');
           can('read', 'Analytics');
           break;
@@ -138,6 +143,7 @@ export class AbilityFactory {
           can('read', 'ProductVariant');
           can('read', 'Category');
           can('read', 'Brand');
+          can('read', 'Inventory');
           can(['create', 'read', 'update', 'delete'], 'Coupon');
           can(['read', 'update', 'delete'], 'ProductReview');
           can('read', 'WishlistItem');
@@ -156,6 +162,7 @@ export class AbilityFactory {
           break;
         case 'VIEWER':
           can('read', 'all');
+          can('read', 'Inventory');
           break;
         case 'CUSTOMER':
           // staff row with CUSTOMER role code should not exist but be safe

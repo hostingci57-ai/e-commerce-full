@@ -6,6 +6,7 @@ import clsx from 'clsx';
 import {
   BarChart3,
   Box,
+  Boxes,
   CreditCard,
   FileSpreadsheet,
   FileText,
@@ -39,6 +40,7 @@ interface NavItem {
 const NAV: NavItem[] = [
   { href: '/dashboard', label: 'Gösterge Paneli', icon: BarChart3 },
   { href: '/products', label: 'Ürünler', icon: Package },
+  { href: '/inventory', label: 'Stok Yönetimi', icon: Boxes },
   { href: '/categories', label: 'Kategoriler', icon: Layers },
   { href: '/brands', label: 'Markalar', icon: Tag },
   { href: '/orders', label: 'Siparişler', icon: ShoppingCart },

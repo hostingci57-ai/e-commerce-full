@@ -82,6 +82,34 @@ export class ProductsService {
         include: { brand: true, variants: true, categories: true },
       });
 
+      // Mirror each freshly-minted variant into the canonical inventory_levels
+      // table. If stockOnHand > 0 we also write an INITIAL audit movement so
+      // "where did this stock come from" is answerable from day one.
+      for (const v of product.variants) {
+        await tx.inventoryLevel.upsert({
+          where: { tenantId_variantId: { tenantId, variantId: v.id } },
+          update: {},
+          create: {
+            tenantId,
+            variantId: v.id,
+            stockOnHand: v.stockOnHand,
+            stockReserved: v.stockReserved,
+          },
+        });
+        if (v.stockOnHand > 0) {
+          await tx.inventoryMovement.create({
+            data: {
+              tenantId,
+              variantId: v.id,
+              type: 'INITIAL',
+              quantity: v.stockOnHand,
+              reason: 'initial',
+              createdBy: this.ctx.userId ?? null,
+            },
+          });
+        }
+      }
+
       await this.outbox.publish(tx, {
         tenantId,
         aggregateType: 'Product',
@@ -238,6 +266,28 @@ export class ProductsService {
             },
             select: { id: true, sku: true },
           });
+          await tx.inventoryLevel.upsert({
+            where: { tenantId_variantId: { tenantId, variantId: created.id } },
+            update: {},
+            create: {
+              tenantId,
+              variantId: created.id,
+              stockOnHand: v.stockOnHand,
+              stockReserved: 0,
+            },
+          });
+          if (v.stockOnHand > 0) {
+            await tx.inventoryMovement.create({
+              data: {
+                tenantId,
+                variantId: created.id,
+                type: 'INITIAL',
+                quantity: v.stockOnHand,
+                reason: 'initial',
+                createdBy: this.ctx.userId ?? null,
+              },
+            });
+          }
           results.push(created);
         }
       }

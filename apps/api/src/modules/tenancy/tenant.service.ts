@@ -3,11 +3,15 @@ import {
   ConflictException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import type { Prisma, PrismaClient, Tenant, TenantStatus } from '@ecf/db';
 import { PRISMA_LANDLORD } from '../../common/prisma/prisma.module';
 import { PasswordService } from '../auth/password.service';
+import { CmsSeedService } from '../cms/cms-seed.service';
+import { I18nService } from '../i18n/i18n.service';
 
 export interface CreateTenantInput {
   subdomain: string;
@@ -39,9 +43,13 @@ export interface TenantStats {
 
 @Injectable()
 export class TenantService {
+  private readonly logger = new Logger(TenantService.name);
+
   constructor(
     @Inject(PRISMA_LANDLORD) private readonly prisma: PrismaClient,
     private readonly passwords: PasswordService,
+    @Optional() private readonly cmsSeed?: CmsSeedService,
+    @Optional() private readonly i18n?: I18nService,
   ) {}
 
   async list(query: ListTenantQuery): Promise<{
@@ -155,6 +163,27 @@ export class TenantService {
           },
           update: { acceptedAt: new Date() },
         });
+      }
+    }
+
+    // Fire-and-forget default CMS pages + menus + TR/EN language bundles.
+    // Optional to keep the tenant module loadable in isolation during tests.
+    if (this.cmsSeed) {
+      try {
+        await this.cmsSeed.seedDefaults(tenant.id);
+      } catch (err) {
+        this.logger.warn(
+          `CMS seed for tenant ${tenant.id} failed: ${(err as Error).message}`,
+        );
+      }
+    }
+    if (this.i18n) {
+      try {
+        await this.i18n.seedDefaultsForTenant(tenant.id);
+      } catch (err) {
+        this.logger.warn(
+          `i18n seed for tenant ${tenant.id} failed: ${(err as Error).message}`,
+        );
       }
     }
 

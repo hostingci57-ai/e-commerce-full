@@ -21,6 +21,9 @@ import { CouponsModule } from './modules/coupons/coupons.module';
 import { RefundsModule } from './modules/refunds/refunds.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { MediaModule } from './modules/media/media.module';
+import { CmsModule } from './modules/cms/cms.module';
+import { SeoModule } from './modules/seo/seo.module';
+import { I18nModule } from './modules/i18n/i18n.module';
 
 @Module({
   imports: [
@@ -49,6 +52,9 @@ import { MediaModule } from './modules/media/media.module';
     RefundsModule,
     WebhooksModule,
     MediaModule,
+    CmsModule,
+    SeoModule,
+    I18nModule,
   ],
 })
 export class AppModule {}

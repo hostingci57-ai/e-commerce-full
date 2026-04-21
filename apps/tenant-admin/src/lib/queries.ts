@@ -426,3 +426,174 @@ export function getMediaSignedUrl(id: string) {
 export function deleteMediaAsset(id: string) {
   return api.delete<{ ok: true }>(`/media/assets/${id}`);
 }
+
+// ----- CMS Pages ------------------------------------------------------------
+
+export interface CmsPageItem {
+  id: string;
+  slug: string;
+  title: string;
+  content: string;
+  metaTitle?: string | null;
+  metaDescription?: string | null;
+  isPublished: boolean;
+  publishedAt?: string | null;
+  showInFooter: boolean;
+  showInHeader: boolean;
+  sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export function listCmsPages(params: {
+  isPublished?: boolean;
+  location?: 'header' | 'footer';
+  limit?: number;
+}) {
+  return api.get<CmsPageItem[]>('/cms/pages', params);
+}
+export function getCmsPage(id: string) {
+  return api.get<CmsPageItem>(`/cms/pages/${id}`);
+}
+export function createCmsPage(body: Partial<CmsPageItem> & { slug: string; title: string; content: string }) {
+  return api.post<CmsPageItem>('/cms/pages', body);
+}
+export function updateCmsPage(id: string, body: Partial<CmsPageItem>) {
+  return api.patch<CmsPageItem>(`/cms/pages/${id}`, body);
+}
+export function deleteCmsPage(id: string) {
+  return api.delete<{ id: string; deleted: true }>(`/cms/pages/${id}`);
+}
+export function publishCmsPage(id: string) {
+  return api.post<CmsPageItem>(`/cms/pages/${id}/publish`);
+}
+export function unpublishCmsPage(id: string) {
+  return api.post<CmsPageItem>(`/cms/pages/${id}/unpublish`);
+}
+
+// ----- CMS Menus ------------------------------------------------------------
+
+export interface CmsMenuItem {
+  label: string;
+  type: 'page' | 'category' | 'url';
+  target: string;
+  sortOrder?: number;
+  children?: CmsMenuItem[];
+}
+export interface CmsMenu {
+  id: string;
+  key: string;
+  name: string;
+  items: CmsMenuItem[];
+  isActive: boolean;
+}
+export function listCmsMenus() {
+  return api.get<CmsMenu[]>('/cms/menus');
+}
+export function getCmsMenu(key: string) {
+  return api.get<CmsMenu>(`/cms/menus/${key}`);
+}
+export function updateCmsMenu(key: string, body: { name?: string; items: CmsMenuItem[]; isActive?: boolean }) {
+  return api.patch<CmsMenu>(`/cms/menus/${key}`, body);
+}
+
+// ----- SEO: Redirects -------------------------------------------------------
+
+export interface RedirectItem {
+  id: string;
+  fromPath: string;
+  toPath: string;
+  statusCode: 301 | 302 | 307 | 308;
+  isActive: boolean;
+  createdAt?: string;
+}
+export function listRedirects(params: { isActive?: boolean; query?: string; limit?: number }) {
+  return api.get<RedirectItem[]>('/seo/redirects', params);
+}
+export function createRedirect(body: {
+  fromPath: string;
+  toPath: string;
+  statusCode?: number;
+  isActive?: boolean;
+}) {
+  return api.post<RedirectItem>('/seo/redirects', body);
+}
+export function updateRedirect(id: string, body: Partial<RedirectItem>) {
+  return api.patch<RedirectItem>(`/seo/redirects/${id}`, body);
+}
+export function deleteRedirect(id: string) {
+  return api.delete<{ id: string; deleted: true }>(`/seo/redirects/${id}`);
+}
+export function importRedirects(csv: string, overwrite = false) {
+  return api.post<{ created: number; updated: number; errors: string[] }>(
+    '/seo/redirects/import',
+    { csv, overwrite },
+  );
+}
+
+// ----- SEO: Settings --------------------------------------------------------
+
+export interface SeoSettings {
+  defaultTitle?: string | null;
+  titleTemplate?: string | null;
+  defaultDescription?: string | null;
+  defaultOgImage?: string | null;
+  robotsTxt?: string | null;
+  googleSiteVerification?: string | null;
+  bingSiteVerification?: string | null;
+}
+export function getSeoSettings() {
+  return api.get<SeoSettings>('/seo/settings');
+}
+export function updateSeoSettings(body: SeoSettings) {
+  return api.patch<SeoSettings>('/seo/settings', body);
+}
+
+// ----- i18n -----------------------------------------------------------------
+
+export interface LanguageItem {
+  code: string;
+  name: string;
+  nativeName: string;
+  rtl: boolean;
+  isActive: boolean;
+}
+export interface TenantLanguageItem {
+  languageCode: string;
+  isDefault: boolean;
+  isPublished: boolean;
+}
+export interface UiBundleItem {
+  languageCode: string;
+  namespace: string;
+  strings: Record<string, string>;
+  version: number;
+  updatedAt?: string;
+}
+
+export function listLanguages() {
+  return api.get<LanguageItem[]>('/i18n/languages');
+}
+export function listTenantLanguages() {
+  return api.get<TenantLanguageItem[]>('/i18n/tenant-languages');
+}
+export function upsertTenantLanguage(body: {
+  languageCode: string;
+  isDefault?: boolean;
+  isPublished?: boolean;
+}) {
+  return api.post<TenantLanguageItem>('/i18n/tenant-languages', body);
+}
+export function deleteTenantLanguage(code: string) {
+  return api.delete<{ deleted: true }>(`/i18n/tenant-languages/${code}`);
+}
+export function listBundles(params: { languageCode?: string; namespace?: string }) {
+  return api.get<UiBundleItem[]>('/i18n/bundles', params);
+}
+export function updateBundle(body: {
+  languageCode: string;
+  namespace: string;
+  strings: Record<string, string>;
+}) {
+  return api.patch<UiBundleItem>('/i18n/bundles', body);
+}

@@ -37,7 +37,13 @@ DECLARE
     'refund_requests',
     'refunds',
     'webhook_subscriptions',
-    'webhook_deliveries'
+    'webhook_deliveries',
+    'cms_pages',
+    'cms_menus',
+    'redirects',
+    'seo_settings',
+    'tenant_languages',
+    'ui_string_bundles'
   ];
 BEGIN
   FOREACH t IN ARRAY tenant_tables LOOP
@@ -134,6 +140,31 @@ CREATE POLICY tenant_isolation ON webhook_subscriptions
   WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
 
 CREATE POLICY tenant_isolation ON webhook_deliveries
+  USING      (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+  WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
+
+-- CMS + SEO + i18n tenant-scoped tables
+CREATE POLICY tenant_isolation ON cms_pages
+  USING      (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+  WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
+
+CREATE POLICY tenant_isolation ON cms_menus
+  USING      (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+  WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
+
+CREATE POLICY tenant_isolation ON redirects
+  USING      (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+  WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
+
+CREATE POLICY tenant_isolation ON seo_settings
+  USING      (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+  WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
+
+CREATE POLICY tenant_isolation ON tenant_languages
+  USING      (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+  WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
+
+CREATE POLICY tenant_isolation ON ui_string_bundles
   USING      (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
   WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
 

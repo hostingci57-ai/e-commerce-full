@@ -8,3 +8,6 @@ export * from './orders';
 export * from './coupons';
 export * from './webhooks';
 export * from './media';
+export * from './cms';
+export * from './seo';
+export * from './i18n';

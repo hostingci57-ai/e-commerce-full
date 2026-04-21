@@ -29,7 +29,15 @@ export type Subject =
   | 'Role'
   | 'Coupon'
   | 'Refund'
-  | 'Webhook';
+  | 'Webhook'
+  | 'Media'
+  | 'CmsPage'
+  | 'CmsMenu'
+  | 'Redirect'
+  | 'SeoSetting'
+  | 'Language'
+  | 'TenantLanguage'
+  | 'UiStringBundle';
 
 export type Action = 'manage' | 'create' | 'read' | 'update' | 'delete' | 'invite';
 export type AppAbility = MongoAbility<[Action, Subject]>;
@@ -110,6 +118,12 @@ export class AbilityFactory {
           can('read', 'Brand');
           can(['create', 'read', 'update', 'delete'], 'Coupon');
           can(['read', 'update'], 'Refund');
+          can(['create', 'read', 'update', 'delete'], 'CmsPage');
+          can(['read', 'update'], 'CmsMenu');
+          can(['create', 'read', 'update', 'delete'], 'Redirect');
+          can(['read', 'update'], 'SeoSetting');
+          can(['read', 'update'], 'TenantLanguage');
+          can(['read', 'update'], 'UiStringBundle');
           break;
         case 'VIEWER':
           can('read', 'all');

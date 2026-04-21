@@ -254,6 +254,100 @@ export const api = {
     },
   },
 
+  cms: {
+    listPages: (location?: 'header' | 'footer', opts: FetchOpts = {}) =>
+      fetcher<
+        Array<{
+          id: string;
+          slug: string;
+          title: string;
+          showInFooter: boolean;
+          showInHeader: boolean;
+          sortOrder: number;
+          updatedAt: string;
+        }>
+      >(`/public/pages${location ? `?location=${location}` : ''}`, {
+        revalidate: 300,
+        ...opts,
+      }),
+    getPage: (slug: string, opts: FetchOpts = {}) =>
+      fetcher<{
+        id: string;
+        slug: string;
+        title: string;
+        content: string;
+        metaTitle: string | null;
+        metaDescription: string | null;
+        publishedAt: string | null;
+        updatedAt: string;
+      }>(`/public/pages/${encodeURIComponent(slug)}`, {
+        revalidate: 300,
+        ...opts,
+      }),
+    getMenu: (key: string, opts: FetchOpts = {}) =>
+      fetcher<{
+        key: string;
+        name: string;
+        items: Array<{
+          label: string;
+          type: 'page' | 'category' | 'url';
+          target: string;
+          sortOrder?: number;
+        }>;
+        isActive: boolean;
+      }>(`/public/menus/${encodeURIComponent(key)}`, {
+        revalidate: 300,
+        ...opts,
+      }),
+  },
+
+  seo: {
+    checkRedirect: (
+      path: string,
+      opts: FetchOpts = {},
+    ): Promise<{ redirect: string | null; status: number | null }> =>
+      fetcher(`/public/redirects/check?path=${encodeURIComponent(path)}`, {
+        revalidate: 300,
+        ...opts,
+      }),
+    getSettings: (opts: FetchOpts = {}) =>
+      fetcher<{
+        defaultTitle: string | null;
+        titleTemplate: string | null;
+        defaultDescription: string | null;
+        defaultOgImage: string | null;
+        googleSiteVerification: string | null;
+        bingSiteVerification: string | null;
+      }>('/public/seo/settings', { revalidate: 300, ...opts }),
+  },
+
+  i18n: {
+    bundle: (
+      lang: string,
+      ns: string,
+      opts: FetchOpts = {},
+    ): Promise<{
+      lang: string;
+      namespace: string;
+      strings: Record<string, string>;
+      version: number;
+    }> =>
+      fetcher(
+        `/public/i18n/bundle?lang=${encodeURIComponent(lang)}&ns=${encodeURIComponent(ns)}`,
+        { revalidate: 300, ...opts },
+      ),
+    languages: (opts: FetchOpts = {}) =>
+      fetcher<
+        Array<{
+          code: string;
+          name: string;
+          nativeName: string;
+          rtl: boolean;
+          isDefault: boolean;
+        }>
+      >('/public/i18n/languages', { revalidate: 300, ...opts }),
+  },
+
   auth: {
     login: (email: string, password: string) =>
       fetcher<{ accessToken: string; refreshToken?: string }>(

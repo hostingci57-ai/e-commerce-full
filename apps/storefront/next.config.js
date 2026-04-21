@@ -1,7 +1,14 @@
+const path = require('path');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // Standalone build — ships a self-contained server.js + trimmed node_modules.
+  // In a monorepo we must pin `outputFileTracingRoot` to the workspace root so
+  // Next.js includes workspace packages (@ecf/types, @ecf/validation) correctly.
+  output: 'standalone',
+  outputFileTracingRoot: path.join(__dirname, '../../'),
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '**.amazonaws.com' },

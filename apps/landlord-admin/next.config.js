@@ -1,6 +1,10 @@
+const path = require('path');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  output: 'standalone',
+  outputFileTracingRoot: path.join(__dirname, '../../'),
   // Avoid statically prerendering any page — this panel is 100% client-side
   // against the API, so there is nothing to render at build time.
   experimental: {

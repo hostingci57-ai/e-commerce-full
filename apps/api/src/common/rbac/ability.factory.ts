@@ -41,15 +41,12 @@ export type Subject =
   | 'Settings'
   | 'Payment'
   | 'Shipment'
-<<<<<<< HEAD
   | 'Analytics'
   | 'Report'
   | 'ProductReview'
   | 'WishlistItem'
-  | 'AbandonedCart';
-=======
+  | 'AbandonedCart'
   | 'Inventory';
->>>>>>> feature/inventory-ui-movements
 
 export type Action = 'manage' | 'create' | 'read' | 'update' | 'delete' | 'invite';
 export type AppAbility = MongoAbility<[Action, Subject]>;

@@ -737,7 +737,6 @@ export function createOrderShipment(
   return api.post(`/orders/${orderId}/shipments`, body);
 }
 
-<<<<<<< HEAD
 // ----- Analytics (Faz 8a) ---------------------------------------------------
 
 export interface AnalyticsRange {
@@ -943,7 +942,8 @@ export function listAbandonedCarts(params: { recovered?: boolean; limit?: number
 
 export function sendAbandonedCartEmail(id: string) {
   return api.post<{ id: string; sent: boolean }>(`/marketing/abandoned-carts/${id}/send-email`);
-=======
+}
+
 // ------- Inventory ---------------------------------------------------------
 
 export type InventoryStatus = 'in_stock' | 'low' | 'out';
@@ -1084,5 +1084,4 @@ export function bulkImportInventory(items: Array<{ variantSku: string; stockOnHa
     succeeded: number;
     failed: Array<{ sku: string; reason: string }>;
   }>('/inventory/bulk-import', { items });
->>>>>>> feature/inventory-ui-movements
 }

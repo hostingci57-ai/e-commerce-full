@@ -237,6 +237,7 @@ async function seedDemoTenant(spec: DemoTenantSpec, plans: Record<string, string
     const customerMap = await seedCustomers(tx, tenantId, spec);
     await seedOrders(tx, tenantId, spec, customerMap);
     await seedCoupons(tx, tenantId, spec);
+    await seedCmsAndI18n(tx, tenantId);
   });
 
   console.log(`[seed] tenant ${spec.subdomain} complete`);
@@ -614,6 +615,184 @@ void ({} as OrderSeed);
 void ({} as ProductSeed);
 
 /* -------------------------------------------------------------------------- */
+/* Languages (global catalog) — seeded once with TR/EN/DE                      */
+/* -------------------------------------------------------------------------- */
+
+async function seedLanguages(): Promise<void> {
+  const langDelegate = (prismaLandlord as unknown as {
+    language?: { upsert: (args: unknown) => Promise<unknown> };
+  }).language;
+  if (!langDelegate || typeof langDelegate.upsert !== 'function') {
+    console.log('[seed] language model absent — skipping language seed');
+    return;
+  }
+  const rows = [
+    { code: 'tr', name: 'Turkish', nativeName: 'Türkçe', rtl: false },
+    { code: 'en', name: 'English', nativeName: 'English', rtl: false },
+    { code: 'de', name: 'German', nativeName: 'Deutsch', rtl: false },
+  ];
+  for (const r of rows) {
+    await (langDelegate as {
+      upsert: (args: {
+        where: { code: string };
+        update: Record<string, unknown>;
+        create: Record<string, unknown>;
+      }) => Promise<unknown>;
+    }).upsert({
+      where: { code: r.code },
+      update: { name: r.name, nativeName: r.nativeName, rtl: r.rtl, isActive: true },
+      create: {
+        code: r.code,
+        name: r.name,
+        nativeName: r.nativeName,
+        rtl: r.rtl,
+        isActive: true,
+      },
+    });
+  }
+  console.log('[seed] languages ok (tr,en,de)');
+}
+
+/* -------------------------------------------------------------------------- */
+/* CMS + i18n defaults per tenant                                              */
+/* -------------------------------------------------------------------------- */
+
+async function seedCmsAndI18n(tx: LocalTx, tenantId: string): Promise<void> {
+  // Pages model may not exist on older branches — guard.
+  const cmsDelegate = (tx as unknown as {
+    cmsPage?: { upsert: (args: unknown) => Promise<unknown> };
+  }).cmsPage;
+  if (!cmsDelegate) {
+    console.log(`[seed]   cms/i18n models absent — skipping for ${tenantId}`);
+    return;
+  }
+
+  const now = new Date();
+  const pages = [
+    {
+      slug: 'hakkimizda',
+      title: 'Hakkımızda',
+      content:
+        '# Hakkımızda\n\nMağazamıza hoş geldiniz. Bu sayfayı tenant panelinden düzenleyebilirsiniz.\n',
+      metaTitle: 'Hakkımızda',
+      metaDescription: 'Mağazamız hakkında bilgi alın.',
+      showInFooter: true,
+      sortOrder: 10,
+    },
+    {
+      slug: 'gizlilik-politikasi',
+      title: 'Gizlilik Politikası',
+      content:
+        '# Gizlilik Politikası\n\nKVKK aydınlatma metninizi buradan düzenleyebilirsiniz.\n',
+      metaTitle: 'Gizlilik Politikası',
+      metaDescription: 'Kişisel verilerin işlenmesi.',
+      showInFooter: true,
+      sortOrder: 20,
+    },
+    {
+      slug: 'kullanim-sartlari',
+      title: 'Kullanım Şartları',
+      content:
+        '# Kullanım Şartları\n\nMağazamızı kullanırken uyulması gereken şartlar.\n',
+      metaTitle: 'Kullanım Şartları',
+      metaDescription: 'Kullanım şartları ve iade.',
+      showInFooter: true,
+      sortOrder: 30,
+    },
+  ];
+
+  type CmsDelegate = {
+    upsert: (args: {
+      where: { tenantId_slug: { tenantId: string; slug: string } };
+      update: Record<string, unknown>;
+      create: Record<string, unknown>;
+    }) => Promise<unknown>;
+  };
+  for (const p of pages) {
+    await (cmsDelegate as unknown as CmsDelegate).upsert({
+      where: { tenantId_slug: { tenantId, slug: p.slug } },
+      update: {},
+      create: {
+        tenantId,
+        slug: p.slug,
+        title: p.title,
+        content: p.content,
+        metaTitle: p.metaTitle,
+        metaDescription: p.metaDescription,
+        isPublished: true,
+        publishedAt: now,
+        showInFooter: p.showInFooter,
+        showInHeader: false,
+        sortOrder: p.sortOrder,
+      },
+    });
+  }
+
+  const menuDelegate = (tx as unknown as {
+    cmsMenu?: {
+      upsert: (args: {
+        where: { tenantId_key: { tenantId: string; key: string } };
+        update: Record<string, unknown>;
+        create: Record<string, unknown>;
+      }) => Promise<unknown>;
+    };
+  }).cmsMenu;
+  if (menuDelegate) {
+    await menuDelegate.upsert({
+      where: { tenantId_key: { tenantId, key: 'main' } },
+      update: {},
+      create: {
+        tenantId,
+        key: 'main',
+        name: 'Ana Menü',
+        items: [{ label: 'Tüm Ürünler', type: 'url', target: '/products', sortOrder: 0 }],
+        isActive: true,
+      },
+    });
+    await menuDelegate.upsert({
+      where: { tenantId_key: { tenantId, key: 'footer' } },
+      update: {},
+      create: {
+        tenantId,
+        key: 'footer',
+        name: 'Footer',
+        items: [
+          { label: 'Hakkımızda', type: 'page', target: 'hakkimizda', sortOrder: 0 },
+          { label: 'Gizlilik', type: 'page', target: 'gizlilik-politikasi', sortOrder: 10 },
+          { label: 'Şartlar', type: 'page', target: 'kullanim-sartlari', sortOrder: 20 },
+        ],
+        isActive: true,
+      },
+    });
+  }
+
+  // Tenant languages
+  const tenantLangDelegate = (tx as unknown as {
+    tenantLanguage?: {
+      upsert: (args: {
+        where: { tenantId_languageCode: { tenantId: string; languageCode: string } };
+        update: Record<string, unknown>;
+        create: Record<string, unknown>;
+      }) => Promise<unknown>;
+    };
+  }).tenantLanguage;
+  if (tenantLangDelegate) {
+    await tenantLangDelegate.upsert({
+      where: { tenantId_languageCode: { tenantId, languageCode: 'tr' } },
+      update: {},
+      create: { tenantId, languageCode: 'tr', isDefault: true, isPublished: true },
+    });
+    await tenantLangDelegate.upsert({
+      where: { tenantId_languageCode: { tenantId, languageCode: 'en' } },
+      update: {},
+      create: { tenantId, languageCode: 'en', isDefault: false, isPublished: true },
+    });
+  }
+
+  console.log(`[seed]   cms/i18n defaults ok for ${tenantId}`);
+}
+
+/* -------------------------------------------------------------------------- */
 /* Main                                                                        */
 /* -------------------------------------------------------------------------- */
 
@@ -622,6 +801,7 @@ async function main(): Promise<void> {
   const plans = await seedPlans();
   const roles = await seedSystemRoles();
   await seedLandlordSuperAdmin();
+  await seedLanguages();
   await seedDemoTenant(kahveDunyasiSpec, plans, roles);
   await seedDemoTenant(modaButikSpec, plans, roles);
   console.log('[seed] complete');

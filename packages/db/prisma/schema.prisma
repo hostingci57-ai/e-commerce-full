@@ -642,3 +642,106 @@ model Refund {
   @@index([tenantId, refundRequestId])
   @@map("refunds")
 }
+
+// ----------- CMS Pages / Menus (FSD 17) --------------------------------------
+
+model CmsPage {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  slug            String    @db.VarChar(255)
+  title           String    @db.VarChar(255)
+  content         String    @db.Text
+  metaTitle       String?   @map("meta_title") @db.VarChar(255)
+  metaDescription String?   @map("meta_description") @db.VarChar(500)
+  isPublished     Boolean   @default(false) @map("is_published")
+  publishedAt     DateTime? @map("published_at")
+  showInFooter    Boolean   @default(false) @map("show_in_footer")
+  showInHeader    Boolean   @default(false) @map("show_in_header")
+  sortOrder       Int       @default(0) @map("sort_order")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, isPublished])
+  @@map("cms_pages")
+}
+
+model CmsMenu {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  key       String   @db.VarChar(32)
+  name      String   @db.VarChar(64)
+  /// Ordered array of items: [{ label, type: 'page'|'category'|'url', target }]
+  items     Json     @default("[]")
+  isActive  Boolean  @default(true) @map("is_active")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, key])
+  @@map("cms_menus")
+}
+
+// ----------- SEO: Redirects + SeoSetting (FSD 16) ----------------------------
+
+model Redirect {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  fromPath   String   @map("from_path") @db.VarChar(500)
+  toPath     String   @map("to_path") @db.VarChar(500)
+  statusCode Int      @default(301) @map("status_code")
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@unique([tenantId, fromPath])
+  @@index([tenantId, isActive])
+  @@map("redirects")
+}
+
+model SeoSetting {
+  tenantId               String   @id @map("tenant_id") @db.Uuid
+  defaultTitle           String?  @map("default_title") @db.VarChar(255)
+  titleTemplate          String?  @default("%s | %shopName") @map("title_template") @db.VarChar(255)
+  defaultDescription     String?  @map("default_description") @db.VarChar(500)
+  defaultOgImage         String?  @map("default_og_image") @db.VarChar(500)
+  robotsTxt              String?  @map("robots_txt") @db.Text
+  googleSiteVerification String?  @map("google_site_verification") @db.VarChar(128)
+  bingSiteVerification   String?  @map("bing_site_verification") @db.VarChar(128)
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  @@map("seo_settings")
+}
+
+// ----------- i18n: Language + TenantLanguage + UiStringBundle ----------------
+
+model Language {
+  code       String  @id @db.VarChar(10)
+  name       String  @db.VarChar(64)
+  nativeName String  @map("native_name") @db.VarChar(64)
+  rtl        Boolean @default(false)
+  isActive   Boolean @default(true) @map("is_active")
+
+  @@map("languages")
+}
+
+model TenantLanguage {
+  tenantId     String  @map("tenant_id") @db.Uuid
+  languageCode String  @map("language_code") @db.VarChar(10)
+  isDefault    Boolean @default(false) @map("is_default")
+  isPublished  Boolean @default(true) @map("is_published")
+
+  @@id([tenantId, languageCode])
+  @@index([tenantId, isDefault])
+  @@map("tenant_languages")
+}
+
+model UiStringBundle {
+  tenantId     String   @map("tenant_id") @db.Uuid
+  languageCode String   @map("language_code") @db.VarChar(10)
+  namespace    String   @db.VarChar(64)
+  /// JSON dictionary { key: translation }
+  strings      Json     @default("{}")
+  version      Int      @default(1)
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@id([tenantId, languageCode, namespace])
+  @@map("ui_string_bundles")
+}

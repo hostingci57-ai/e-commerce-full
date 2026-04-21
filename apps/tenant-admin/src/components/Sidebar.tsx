@@ -6,10 +6,15 @@ import clsx from 'clsx';
 import {
   BarChart3,
   Box,
+  FileText,
+  Globe,
+  Languages,
   Layers,
+  Link as LinkIcon,
   Package,
   Percent,
   Receipt,
+  Search,
   Settings,
   ShoppingCart,
   Tag,
@@ -32,6 +37,12 @@ const NAV: NavItem[] = [
   { href: '/orders/draft', label: 'Taslak Siparişler', icon: Receipt },
   { href: '/coupons', label: 'Kuponlar', icon: Percent },
   { href: '/customers', label: 'Müşteriler', icon: Users },
+  { href: '/content/pages', label: 'Sayfalar', icon: FileText },
+  { href: '/content/menus', label: 'Menüler', icon: LinkIcon },
+  { href: '/seo/settings', label: 'SEO Ayarları', icon: Search },
+  { href: '/seo/redirects', label: 'Yönlendirmeler', icon: Globe },
+  { href: '/settings/languages', label: 'Diller', icon: Languages },
+  { href: '/settings/translations', label: 'Çeviriler', icon: Languages },
   { href: '/settings', label: 'Ayarlar', icon: Settings },
 ];
 

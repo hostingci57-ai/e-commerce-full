@@ -17,6 +17,9 @@ import { InventoryModule } from './modules/inventory/inventory.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { CouponsModule } from './modules/coupons/coupons.module';
 import { RefundsModule } from './modules/refunds/refunds.module';
+import { CmsModule } from './modules/cms/cms.module';
+import { SeoModule } from './modules/seo/seo.module';
+import { I18nModule } from './modules/i18n/i18n.module';
 
 @Module({
   imports: [
@@ -41,6 +44,9 @@ import { RefundsModule } from './modules/refunds/refunds.module';
     OrdersModule,
     CheckoutModule,
     RefundsModule,
+    CmsModule,
+    SeoModule,
+    I18nModule,
   ],
 })
 export class AppModule {}

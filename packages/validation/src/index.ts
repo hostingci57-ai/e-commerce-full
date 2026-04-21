@@ -6,3 +6,6 @@ export * from './cart';
 export * from './checkout';
 export * from './orders';
 export * from './coupons';
+export * from './cms';
+export * from './seo';
+export * from './i18n';

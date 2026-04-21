@@ -241,6 +241,9 @@ async function seedDemoTenant(spec: DemoTenantSpec, plans: Record<string, string
     await seedTenantSettings(tx, tenantId, spec);
     await seedPaymentMethods(tx, tenantId);
     await seedShippingMethods(tx, tenantId);
+    await seedReviews(tx, tenantId, customerMap);
+    await seedWishlists(tx, tenantId, customerMap);
+    await seedAbandonedCarts(tx, tenantId, customerMap);
   });
 
   console.log(`[seed] tenant ${spec.subdomain} complete`);
@@ -967,6 +970,197 @@ async function seedShippingMethods(tx: LocalTx, tenantId: string): Promise<void>
     });
   }
   console.log(`[seed]   shippingMethodConfigs (${methods.length}) ok`);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Reviews + Wishlist + Abandoned carts (Faz 8b)                               */
+/* -------------------------------------------------------------------------- */
+
+async function seedReviews(
+  tx: LocalTx,
+  tenantId: string,
+  customers: Map<string, string>,
+): Promise<void> {
+  const products = await tx.product.findMany({
+    where: { tenantId, status: 'active' },
+    orderBy: { createdAt: 'asc' },
+    take: 3,
+  });
+  const customerIds = Array.from(customers.values());
+  if (products.length === 0 || customerIds.length === 0) {
+    console.log('[seed]   reviews skipped (no products/customers)');
+    return;
+  }
+
+  // Deterministic mix: (productIdx, customerIdx) → rating/title/comment
+  const titles = [
+    'Harika ürün!',
+    'Beklediğim gibi',
+    'Fiyatına göre iyi',
+    'Kargolama hızlıydı',
+    'Tekrar alırım',
+    'Ortalama',
+    null,
+    'Tavsiye ederim',
+    'Eh işte',
+    'Süper memnun kaldım',
+  ];
+  const comments = [
+    'Kalitesi için teşekkürler, çok beğendim.',
+    'Tam aradığım özelliklere sahip.',
+    'Paketleme özenliydi, ürün sorunsuz geldi.',
+    'Bu fiyata kaçırılmaz.',
+    'Bazı küçük detaylar olsa daha iyi olurmuş.',
+    'İlk izlenim olumlu, kullanıp yorumu güncelleyeceğim.',
+    null,
+    'Tavsiye üzerine aldım, memnun kaldım.',
+    'Beklediğimden daha iyi çıktı.',
+    'Her şey yolunda, teşekkürler.',
+  ];
+
+  let total = 0;
+  for (let p = 0; p < products.length; p += 1) {
+    const product = products[p];
+    const reviewCount = 5 + p; // 5, 6, 7 reviews
+    const picked = customerIds.slice(0, Math.min(reviewCount, customerIds.length));
+    for (let c = 0; c < picked.length; c += 1) {
+      const customerId = picked[c];
+      const seed = (p * 7 + c * 3) % 10;
+      const rating = ((seed % 5) + 1) as 1 | 2 | 3 | 4 | 5;
+      // Every 3rd review from a customer who has a delivered order in seed is
+      // verified-buyer; rather than joining, we pick every other one to be
+      // APPROVED and the rest PENDING — a realistic moderation mix.
+      const isVerifiedBuyer = c % 2 === 0;
+      const status = isVerifiedBuyer ? 'APPROVED' : c % 3 === 0 ? 'APPROVED' : 'PENDING';
+      await tx.productReview.upsert({
+        where: {
+          tenantId_productId_customerId: { tenantId, productId: product.id, customerId },
+        },
+        update: {},
+        create: {
+          tenantId,
+          productId: product.id,
+          customerId,
+          rating,
+          title: titles[seed],
+          comment: comments[seed],
+          status,
+          isVerifiedBuyer,
+          helpfulCount: Math.max(0, (seed % 4) - 1),
+        },
+      });
+      total += 1;
+    }
+  }
+  console.log(`[seed]   productReviews (${total}) ok`);
+}
+
+async function seedWishlists(
+  tx: LocalTx,
+  tenantId: string,
+  customers: Map<string, string>,
+): Promise<void> {
+  const customerIds = Array.from(customers.values()).slice(0, 2);
+  const products = await tx.product.findMany({
+    where: { tenantId, status: 'active' },
+    orderBy: { createdAt: 'asc' },
+    take: 5,
+  });
+  if (customerIds.length === 0 || products.length === 0) {
+    console.log('[seed]   wishlists skipped');
+    return;
+  }
+  let total = 0;
+  for (let c = 0; c < customerIds.length; c += 1) {
+    const customerId = customerIds[c];
+    const productSlice = products.slice(c, c + 3 + c); // 3..5 items per customer
+    for (const p of productSlice) {
+      await tx.wishlistItem.upsert({
+        where: {
+          tenantId_customerId_productId: { tenantId, customerId, productId: p.id },
+        },
+        update: {},
+        create: { tenantId, customerId, productId: p.id },
+      });
+      total += 1;
+    }
+  }
+  console.log(`[seed]   wishlistItems (${total}) ok`);
+}
+
+async function seedAbandonedCarts(
+  tx: LocalTx,
+  tenantId: string,
+  customers: Map<string, string>,
+): Promise<void> {
+  const variants = await tx.productVariant.findMany({ where: { tenantId }, take: 6 });
+  if (variants.length === 0) {
+    console.log('[seed]   abandonedCarts skipped (no variants)');
+    return;
+  }
+  const customerIds = Array.from(customers.entries()); // [email, id]
+  const samples = [
+    {
+      cartToken: `cart:t:${tenantId}:g:seed-guest-abandon-1`,
+      customerEmail: 'anonim-1@example.local',
+      customerId: null as string | null,
+      variantIdxs: [0, 1],
+      hoursAgo: 26,
+      recoveryEmailSent: false,
+    },
+    {
+      cartToken: `cart:t:${tenantId}:g:seed-guest-abandon-2`,
+      customerEmail: customerIds[0]?.[0] ?? 'anonim-2@example.local',
+      customerId: customerIds[0]?.[1] ?? null,
+      variantIdxs: [2, 3, 4],
+      hoursAgo: 8,
+      recoveryEmailSent: false,
+    },
+    {
+      cartToken: `cart:t:${tenantId}:c:${customerIds[1]?.[1] ?? 'seed-member'}`,
+      customerEmail: customerIds[1]?.[0] ?? null,
+      customerId: customerIds[1]?.[1] ?? null,
+      variantIdxs: [0, 4, 5 % variants.length],
+      hoursAgo: 72,
+      recoveryEmailSent: true,
+    },
+  ];
+
+  for (const s of samples) {
+    const items = s.variantIdxs
+      .map((i) => variants[i])
+      .filter((v): v is (typeof variants)[number] => Boolean(v))
+      .map((v) => ({
+        variantId: v.id,
+        productId: v.productId,
+        sku: v.sku,
+        title: `Ürün ${v.sku}`,
+        qty: 1,
+        priceMinor: v.priceMinorUnits.toString(),
+      }));
+    if (items.length === 0) continue;
+    const totalAmount = items.reduce(
+      (acc, i) => acc + BigInt(i.priceMinor) * BigInt(i.qty),
+      0n,
+    );
+    const createdAt = new Date(Date.now() - s.hoursAgo * 60 * 60 * 1000);
+    await tx.abandonedCart.upsert({
+      where: { tenantId_cartToken: { tenantId, cartToken: s.cartToken } },
+      update: {},
+      create: {
+        tenantId,
+        cartToken: s.cartToken,
+        customerId: s.customerId,
+        customerEmail: s.customerEmail,
+        itemsSnapshot: items as unknown as Prisma.InputJsonValue,
+        totalAmount,
+        currency: CURRENCY,
+        createdAt,
+        recoveryEmailSentAt: s.recoveryEmailSent ? new Date(createdAt.getTime() + 60 * 60 * 1000) : null,
+      },
+    });
+  }
+  console.log(`[seed]   abandonedCarts (${samples.length}) ok`);
 }
 
 /* -------------------------------------------------------------------------- */

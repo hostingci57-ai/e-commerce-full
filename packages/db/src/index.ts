@@ -43,4 +43,8 @@ export type {
   WebhookDelivery,
   PaymentStatus,
   ShipmentStatus,
+  ProductReview,
+  ReviewStatus,
+  WishlistItem,
+  AbandonedCart,
 } from '@prisma/client';

@@ -42,7 +42,10 @@ export type Subject =
   | 'Payment'
   | 'Shipment'
   | 'Analytics'
-  | 'Report';
+  | 'Report'
+  | 'ProductReview'
+  | 'WishlistItem'
+  | 'AbandonedCart';
 
 export type Action = 'manage' | 'create' | 'read' | 'update' | 'delete' | 'invite';
 export type AppAbility = MongoAbility<[Action, Subject]>;
@@ -70,6 +73,19 @@ export class AbilityFactory {
       can('read', 'Category');
       can('read', 'Brand');
       can(['create', 'read', 'update'], 'Cart');
+      can('read', 'ProductReview');
+      if (ctx.customerId) {
+        (can as unknown as (a: Action | Action[], s: Subject, c?: unknown) => unknown)(
+          ['create', 'read', 'update', 'delete'],
+          'ProductReview',
+          { customerId: ctx.customerId },
+        );
+        (can as unknown as (a: Action | Action[], s: Subject, c?: unknown) => unknown)(
+          ['create', 'read', 'delete'],
+          'WishlistItem',
+          { customerId: ctx.customerId },
+        );
+      }
       if (ctx.customerId) {
         // Casl 6 narrows conditions from the Subject union; cast since our
         // subjects are bare string literals without a schema attached.
@@ -123,6 +139,9 @@ export class AbilityFactory {
           can('read', 'Category');
           can('read', 'Brand');
           can(['create', 'read', 'update', 'delete'], 'Coupon');
+          can(['read', 'update', 'delete'], 'ProductReview');
+          can('read', 'WishlistItem');
+          can(['read', 'update'], 'AbandonedCart');
           can(['read', 'update'], 'Refund');
           can(['create', 'read', 'update', 'delete'], 'CmsPage');
           can(['read', 'update'], 'CmsMenu');

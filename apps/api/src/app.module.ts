@@ -29,6 +29,9 @@ import { ApiShippingModule } from './modules/shipping/shipping.module';
 import { TenantSettingsModule } from './modules/tenant-settings/tenant-settings.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { ReviewsModule } from './modules/reviews/reviews.module';
+import { WishlistModule } from './modules/wishlist/wishlist.module';
+import { AbandonedCartModule } from './modules/abandoned-cart/abandoned-cart.module';
 
 @Module({
   imports: [
@@ -65,6 +68,9 @@ import { ReportsModule } from './modules/reports/reports.module';
     TenantSettingsModule,
     AnalyticsModule,
     ReportsModule,
+    ReviewsModule,
+    WishlistModule,
+    AbandonedCartModule,
   ],
 })
 export class AppModule {}

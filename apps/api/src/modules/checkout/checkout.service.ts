@@ -21,6 +21,9 @@ import { OrdersService } from '../orders/orders.service';
 import { PaymentsService } from '../payments/payments.service';
 import { ShippingRegistryService } from '../../common/shipping/shipping-registry.service';
 import type { CheckoutSession, CheckoutStep } from './checkout.types';
+// NOTE: we intentionally do NOT import AbandonedCartService here — that module
+// depends on CartModule which checkout already depends on; rather than adding
+// a circular risk we write the recovery marker with a single Prisma call.
 
 /** Checkout sessions last 15 min — same TTL as the inventory reservation. */
 const CHECKOUT_TTL_SECONDS = 15 * 60;
@@ -386,6 +389,22 @@ export class CheckoutService {
       customerId: session.customerId,
       cartToken: session.cartToken,
     };
+    // Mark any matching abandoned-cart row as recovered. AbandonedCartService
+    // stores the full Redis cart key as `cartToken`; reconstruct the same key
+    // so the recovery metric picks up both guest + member completions.
+    const recoveryToken = session.customerId
+      ? `cart:t:${session.tenantId}:c:${session.customerId}`
+      : session.cartToken
+        ? `cart:t:${session.tenantId}:g:${session.cartToken}`
+        : null;
+    if (recoveryToken) {
+      await withTenant({ tenantId: session.tenantId }, (tx) =>
+        tx.abandonedCart.updateMany({
+          where: { tenantId: session.tenantId, cartToken: recoveryToken, recoveredAt: null },
+          data: { recoveredAt: new Date() },
+        }),
+      ).catch(() => null);
+    }
     await this.cart.clear(owner);
 
     session.orderId = order.id;

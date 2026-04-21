@@ -846,3 +846,100 @@ export function fetchOrdersByStatus(range: AnalyticsRange) {
 export function fetchAlerts() {
   return api.get<AlertsResponse>('/analytics/alerts');
 }
+
+// ---------------------------------------------------------------------------
+// Reviews — moderation (Faz 8b)
+// ---------------------------------------------------------------------------
+
+export type ReviewStatusValue = 'PENDING' | 'APPROVED' | 'REJECTED' | 'SPAM';
+
+export interface AdminReview {
+  id: string;
+  productId: string;
+  productTitle: string | null;
+  productSlug: string | null;
+  customerId: string;
+  customerEmail: string | null;
+  customerName: string;
+  rating: number;
+  title: string | null;
+  comment: string | null;
+  status: ReviewStatusValue;
+  isVerifiedBuyer: boolean;
+  helpfulCount: number;
+  createdAt: string;
+}
+
+export interface AdminReviewList {
+  items: AdminReview[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+}
+
+export function listAdminReviews(params: {
+  status?: ReviewStatusValue;
+  productId?: string;
+  rating?: number;
+  page?: number;
+  pageSize?: number;
+}) {
+  return api.get<AdminReviewList>('/reviews', params);
+}
+
+export function getAdminReview(id: string) {
+  return api.get<
+    AdminReview & {
+      product: { id: string; title: string; slug: string } | null;
+      customer: { id: string; email: string; name: string } | null;
+    }
+  >(`/reviews/${id}`);
+}
+
+export function approveReview(id: string) {
+  return api.patch<AdminReview>(`/reviews/${id}/approve`);
+}
+
+export function rejectReview(id: string, reason?: string) {
+  return api.patch<AdminReview>(`/reviews/${id}/reject`, { reason });
+}
+
+export function deleteReview(id: string) {
+  return api.delete<{ id: string; deleted: true }>(`/reviews/${id}`);
+}
+
+// ---------------------------------------------------------------------------
+// Abandoned carts (Faz 8b)
+// ---------------------------------------------------------------------------
+
+export interface AbandonedCartRow {
+  id: string;
+  cartToken: string;
+  customerId: string | null;
+  customerEmail: string | null;
+  itemsSnapshot: Array<{
+    variantId: string;
+    productId: string;
+    sku: string;
+    title: string;
+    qty: number;
+    priceMinor: string;
+  }>;
+  totalAmount: string;
+  currency: string;
+  recoveredAt: string | null;
+  recoveryEmailSentAt: string | null;
+  createdAt: string;
+}
+
+export function listAbandonedCarts(params: { recovered?: boolean; limit?: number; cursor?: string }) {
+  return api.get<{ items: AbandonedCartRow[]; nextCursor: string | null; hasMore: boolean }>(
+    '/marketing/abandoned-carts',
+    params,
+  );
+}
+
+export function sendAbandonedCartEmail(id: string) {
+  return api.post<{ id: string; sent: boolean }>(`/marketing/abandoned-carts/${id}/send-email`);
+}

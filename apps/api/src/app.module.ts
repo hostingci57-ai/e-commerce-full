@@ -27,6 +27,8 @@ import { I18nModule } from './modules/i18n/i18n.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { ApiShippingModule } from './modules/shipping/shipping.module';
 import { TenantSettingsModule } from './modules/tenant-settings/tenant-settings.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { ReportsModule } from './modules/reports/reports.module';
 
 @Module({
   imports: [
@@ -61,6 +63,8 @@ import { TenantSettingsModule } from './modules/tenant-settings/tenant-settings.
     PaymentsModule,
     ApiShippingModule,
     TenantSettingsModule,
+    AnalyticsModule,
+    ReportsModule,
   ],
 })
 export class AppModule {}

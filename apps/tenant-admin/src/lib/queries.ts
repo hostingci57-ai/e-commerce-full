@@ -736,3 +736,113 @@ export function createOrderShipment(
 ) {
   return api.post(`/orders/${orderId}/shipments`, body);
 }
+
+// ----- Analytics (Faz 8a) ---------------------------------------------------
+
+export interface AnalyticsRange {
+  from?: string;
+  to?: string;
+}
+
+export interface KpiResponse {
+  revenueMinor: string;
+  orderCount: number;
+  newCustomerCount: number;
+  conversionRate: number;
+  averageOrderValueMinor: string;
+  sessionCount: number;
+  from: string;
+  to: string;
+}
+
+export interface RevenuePoint {
+  period: string;
+  revenueMinor: string;
+  orderCount: number;
+}
+
+export interface TopProductRow {
+  productId: string;
+  title: string;
+  totalQuantity: number;
+  totalRevenueMinor: string;
+}
+
+export interface TopCustomerRow {
+  customerId: string;
+  email: string;
+  name: string;
+  orderCount: number;
+  totalSpentMinor: string;
+}
+
+export interface CategoryBreakdownRow {
+  categoryId: string;
+  name: string;
+  totalRevenueMinor: string;
+  orderCount: number;
+}
+
+export interface StatusHistogramRow {
+  status: string;
+  count: number;
+}
+
+export interface AlertsResponse {
+  lowStockCount: number;
+  pendingRefundCount: number;
+  abandonedCartCount: number;
+  bankTransferPendingCount: number;
+}
+
+type QueryParams = Record<string, string | number | boolean | undefined | null>;
+
+function toQuery(input: Record<string, unknown>): QueryParams {
+  const out: QueryParams = {};
+  for (const [k, v] of Object.entries(input)) {
+    if (v === undefined || v === null) continue;
+    if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') {
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
+export function fetchKpis(range: AnalyticsRange) {
+  return api.get<KpiResponse>('/analytics/kpis', toQuery({ ...range }));
+}
+export function fetchRevenueSeries(
+  range: AnalyticsRange & { granularity?: 'day' | 'week' | 'month' },
+) {
+  return api.get<RevenuePoint[]>(
+    '/analytics/revenue-series',
+    toQuery({ ...range }),
+  );
+}
+export function fetchTopProducts(range: AnalyticsRange & { limit?: number }) {
+  return api.get<TopProductRow[]>(
+    '/analytics/top-products',
+    toQuery({ ...range }),
+  );
+}
+export function fetchTopCustomers(range: AnalyticsRange & { limit?: number }) {
+  return api.get<TopCustomerRow[]>(
+    '/analytics/top-customers',
+    toQuery({ ...range }),
+  );
+}
+export function fetchSalesByCategory(range: AnalyticsRange) {
+  return api.get<CategoryBreakdownRow[]>(
+    '/analytics/sales-by-category',
+    toQuery({ ...range }),
+  );
+}
+export function fetchOrdersByStatus(range: AnalyticsRange) {
+  return api.get<StatusHistogramRow[]>(
+    '/analytics/orders-by-status',
+    toQuery({ ...range }),
+  );
+}
+export function fetchAlerts() {
+  return api.get<AlertsResponse>('/analytics/alerts');
+}

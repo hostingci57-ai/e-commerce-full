@@ -493,8 +493,23 @@ async function seedOrders(
     const discount = o.discountMinor ?? 0n;
     const total = subtotal + shipping - discount;
 
+    // Spread orders across a 30-day window for realistic time-series charts.
+    // We derive a deterministic offset from the order number so re-runs stay
+    // idempotent. pending_payment orders keep their `daysAgo` (≈ today) so the
+    // FSD 5.1 "bank-transfer alerts" widget doesn't randomly flip.
+    const keepsOriginal =
+      o.status === 'pending_payment' ||
+      o.status === 'payment_failed' ||
+      o.status === 'draft';
+    const spreadDays = keepsOriginal
+      ? o.daysAgo
+      : hashOrderNumber(o.orderNumber) % 30;
     const placedAt = new Date();
-    placedAt.setUTCDate(placedAt.getUTCDate() - o.daysAgo);
+    placedAt.setUTCDate(placedAt.getUTCDate() - spreadDays);
+    // Also randomise the hour-of-day so `date_trunc('day', ...)` sees events
+    // scattered through the day (useful for intraday checks later).
+    const hourOffset = (hashOrderNumber(o.orderNumber) >> 5) % 24;
+    placedAt.setUTCHours(hourOffset, 0, 0, 0);
 
     const statusTimes: {
       paidAt?: Date;
@@ -527,6 +542,13 @@ async function seedOrders(
       continue;
     }
 
+    // Some orders should use bank_transfer so the dashboard alerts widget has
+    // data to render. Deterministic: every 4th order (by hash) flips provider.
+    const paymentProvider =
+      o.status === 'pending_payment' && hashOrderNumber(o.orderNumber) % 4 === 0
+        ? 'bank_transfer'
+        : 'stub';
+
     await tx.order.create({
       data: {
         tenantId,
@@ -539,9 +561,12 @@ async function seedOrders(
         discountMinor: discount,
         totalMinor: total,
         currency: CURRENCY,
-        paymentProvider: 'stub',
+        paymentProvider,
         paymentRef: o.status !== 'pending_payment' ? `stub_${o.orderNumber}` : null,
         placedAt,
+        // Align createdAt with placedAt so time-series analytics charts aren't
+        // skewed by re-seed timestamps.
+        createdAt: placedAt,
         ...statusTimes,
         lines: { createMany: { data: linesData } },
         statusHistory: {
@@ -555,6 +580,20 @@ async function seedOrders(
       },
     });
   }
+}
+
+/**
+ * Cheap deterministic string hash — FNV-1a 32-bit. Used to spread order
+ * `placedAt` / `createdAt` across a 30-day window for realistic analytics
+ * charts without introducing randomness (so reruns stay idempotent).
+ */
+function hashOrderNumber(value: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < value.length; i++) {
+    h ^= value.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
 }
 
 /* -------------------------------------------------------------------------- */

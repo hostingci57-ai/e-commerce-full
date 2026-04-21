@@ -40,7 +40,9 @@ export type Subject =
   | 'UiStringBundle'
   | 'Settings'
   | 'Payment'
-  | 'Shipment';
+  | 'Shipment'
+  | 'Analytics'
+  | 'Report';
 
 export type Action = 'manage' | 'create' | 'read' | 'update' | 'delete' | 'invite';
 export type AppAbility = MongoAbility<[Action, Subject]>;
@@ -108,6 +110,7 @@ export class AbilityFactory {
           can(['create', 'read', 'update', 'delete'], 'Brand');
           can(['create', 'read', 'update', 'delete'], 'MediaAsset');
           can('read', 'Order');
+          can('read', 'Analytics');
           break;
         case 'ORDER_OPERATOR':
           can('read', 'Order');
@@ -129,6 +132,8 @@ export class AbilityFactory {
           can(['read', 'update'], 'UiStringBundle');
           can(['create', 'read', 'update'], 'Payment');
           can(['create', 'read', 'update'], 'Shipment');
+          can('read', 'Analytics');
+          can('read', 'Report');
           break;
         case 'VIEWER':
           can('read', 'all');

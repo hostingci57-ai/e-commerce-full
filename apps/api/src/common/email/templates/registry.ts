@@ -93,6 +93,21 @@ Mağaza URL'niz: https://{{subdomain}}.{{baseDomain}}
 
 ECF Ekibi`,
   },
+  'low-stock-alert': {
+    subject: '{{tenantName}} — Düşük stok uyarısı ({{itemCount}} ürün)',
+    text: `Merhaba,
+
+{{tenantName}} mağazanızda {{itemCount}} ürün düşük stok eşiğine indi veya tükendi.
+
+{{#each items}}
+- {{sku}} — {{productTitle}} · Mevcut: {{available}} / Eşik: {{lowStockThreshold}}
+{{/each}}
+
+Lütfen yönetim panelinden stok seviyelerini güncelleyin:
+{{adminUrl}}/inventory
+
+{{tenantName}}`,
+  },
 };
 
 const COMPILED = new Map<string, { subject: HandlebarsTemplateDelegate; text: HandlebarsTemplateDelegate; html?: HandlebarsTemplateDelegate }>();

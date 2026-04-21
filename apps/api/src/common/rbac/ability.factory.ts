@@ -40,7 +40,8 @@ export type Subject =
   | 'UiStringBundle'
   | 'Settings'
   | 'Payment'
-  | 'Shipment';
+  | 'Shipment'
+  | 'Inventory';
 
 export type Action = 'manage' | 'create' | 'read' | 'update' | 'delete' | 'invite';
 export type AppAbility = MongoAbility<[Action, Subject]>;
@@ -107,6 +108,7 @@ export class AbilityFactory {
           can(['create', 'read', 'update', 'delete'], 'Category');
           can(['create', 'read', 'update', 'delete'], 'Brand');
           can(['create', 'read', 'update', 'delete'], 'MediaAsset');
+          can('manage', 'Inventory');
           can('read', 'Order');
           break;
         case 'ORDER_OPERATOR':
@@ -119,6 +121,7 @@ export class AbilityFactory {
           can('read', 'ProductVariant');
           can('read', 'Category');
           can('read', 'Brand');
+          can('read', 'Inventory');
           can(['create', 'read', 'update', 'delete'], 'Coupon');
           can(['read', 'update'], 'Refund');
           can(['create', 'read', 'update', 'delete'], 'CmsPage');
@@ -132,6 +135,7 @@ export class AbilityFactory {
           break;
         case 'VIEWER':
           can('read', 'all');
+          can('read', 'Inventory');
           break;
         case 'CUSTOMER':
           // staff row with CUSTOMER role code should not exist but be safe

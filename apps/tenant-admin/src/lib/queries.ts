@@ -736,3 +736,145 @@ export function createOrderShipment(
 ) {
   return api.post(`/orders/${orderId}/shipments`, body);
 }
+
+// ------- Inventory ---------------------------------------------------------
+
+export type InventoryStatus = 'in_stock' | 'low' | 'out';
+
+export interface InventoryLevelRow {
+  variantId: string;
+  sku: string;
+  productId: string;
+  productSlug: string;
+  productTitle: string;
+  priceMinorUnits: string;
+  currency: string;
+  stockOnHand: number;
+  stockReserved: number;
+  available: number;
+  lowStockThreshold: number;
+  status: InventoryStatus;
+}
+
+export type InventoryMovementType =
+  | 'ADJUSTMENT'
+  | 'RESERVATION'
+  | 'RELEASE'
+  | 'FULFILLMENT'
+  | 'RETURN'
+  | 'DAMAGE'
+  | 'INITIAL';
+
+export interface InventoryMovementRow {
+  id: string;
+  variantId: string;
+  type: InventoryMovementType;
+  quantity: number;
+  reason: string | null;
+  reference: string | null;
+  note: string | null;
+  createdBy: string | null;
+  createdAt: string;
+}
+
+export function listInventoryLevels(params: {
+  query?: string;
+  lowStock?: boolean;
+  outOfStock?: boolean;
+  page?: number;
+  limit?: number;
+}): Promise<{
+  items: InventoryLevelRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+}> {
+  return api.get('/inventory/levels', {
+    query: params.query,
+    lowStock: params.lowStock,
+    outOfStock: params.outOfStock,
+    page: params.page ?? 1,
+    limit: params.limit ?? 25,
+  });
+}
+
+export function getInventoryLevel(variantId: string) {
+  return api.get<{
+    variantId: string;
+    stockOnHand: number;
+    stockReserved: number;
+    available: number;
+    lowStockThreshold: number;
+  }>(`/inventory/levels/${variantId}`);
+}
+
+export function updateInventoryThreshold(
+  variantId: string,
+  lowStockThreshold: number,
+) {
+  return api.patch<{
+    variantId: string;
+    stockOnHand: number;
+    stockReserved: number;
+    lowStockThreshold: number;
+  }>(`/inventory/levels/${variantId}`, { lowStockThreshold });
+}
+
+export function adjustStock(input: {
+  variantId: string;
+  delta: number;
+  reason?: string;
+  note?: string | null;
+  reference?: string | null;
+}) {
+  return api.post<{
+    variantId: string;
+    stockOnHand: number;
+    stockReserved: number;
+    available: number;
+  }>('/inventory/adjust', input);
+}
+
+export function listMovements(params: {
+  variantId?: string;
+  type?: InventoryMovementType;
+  from?: string;
+  to?: string;
+  page?: number;
+  limit?: number;
+}): Promise<{
+  items: InventoryMovementRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+}> {
+  return api.get('/inventory/movements', {
+    variantId: params.variantId,
+    type: params.type,
+    from: params.from,
+    to: params.to,
+    page: params.page ?? 1,
+    limit: params.limit ?? 50,
+  });
+}
+
+export function listLowStock() {
+  return api.get<
+    Array<{
+      variantId: string;
+      sku: string;
+      productTitle: string;
+      stockOnHand: number;
+      stockReserved: number;
+      lowStockThreshold: number;
+      available: number;
+    }>
+  >('/inventory/low-stock');
+}
+
+export function bulkImportInventory(items: Array<{ variantSku: string; stockOnHand: number; lowStockThreshold?: number }>) {
+  return api.post<{
+    succeeded: number;
+    failed: Array<{ sku: string; reason: string }>;
+  }>('/inventory/bulk-import', { items });
+}

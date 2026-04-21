@@ -241,6 +241,7 @@ async function seedDemoTenant(spec: DemoTenantSpec, plans: Record<string, string
     await seedTenantSettings(tx, tenantId, spec);
     await seedPaymentMethods(tx, tenantId);
     await seedShippingMethods(tx, tenantId);
+    await seedInventoryDemoStates(tx, tenantId, spec.subdomain);
   });
 
   console.log(`[seed] tenant ${spec.subdomain} complete`);
@@ -340,10 +341,10 @@ async function seedProducts(tx: LocalTx, tenantId: string, spec: DemoTenantSpec)
       }
     }
 
-    // variants
+    // variants + canonical inventory levels + INITIAL movement
     for (const v of p.variants) {
       const ov1 = v.optionValue ? optionValueMap.get(v.optionValue) ?? null : null;
-      await tx.productVariant.upsert({
+      const variant = await tx.productVariant.upsert({
         where: { tenantId_sku: { tenantId, sku: v.sku } },
         update: {
           productId: product.id,
@@ -364,7 +365,38 @@ async function seedProducts(tx: LocalTx, tenantId: string, spec: DemoTenantSpec)
           stockReserved: 0,
           optionValue1Id: ov1,
         },
+        select: { id: true },
       });
+      await tx.inventoryLevel.upsert({
+        where: { tenantId_variantId: { tenantId, variantId: variant.id } },
+        update: { stockOnHand: v.stockOnHand },
+        create: {
+          tenantId,
+          variantId: variant.id,
+          stockOnHand: v.stockOnHand,
+          stockReserved: 0,
+          lowStockThreshold: 5,
+        },
+      });
+      const movementExists = await tx.inventoryMovement.findFirst({
+        where: {
+          tenantId,
+          variantId: variant.id,
+          type: 'INITIAL',
+        },
+        select: { id: true },
+      });
+      if (!movementExists && v.stockOnHand > 0) {
+        await tx.inventoryMovement.create({
+          data: {
+            tenantId,
+            variantId: variant.id,
+            type: 'INITIAL',
+            quantity: v.stockOnHand,
+            reason: 'initial',
+          },
+        });
+      }
     }
 
     // category links
@@ -399,6 +431,71 @@ async function seedProducts(tx: LocalTx, tenantId: string, spec: DemoTenantSpec)
       });
     }
   }
+}
+
+/**
+ * Demo states for the inventory UI — only for the first tenant so charts
+ * and alert flows have something interesting to show:
+ *
+ *   - 5 variants driven down to a low (2–4) count
+ *   - 2 variants zeroed out (OOS)
+ *
+ * Idempotent: writes an ADJUSTMENT movement only if the current on-hand
+ * differs from the target.
+ */
+async function seedInventoryDemoStates(
+  tx: LocalTx,
+  tenantId: string,
+  subdomain: string,
+): Promise<void> {
+  // Only decorate the first demo tenant's catalog — keeps the second one as
+  // a "healthy stock" reference in the admin.
+  if (subdomain !== 'kahve') return;
+  const variants = await tx.productVariant.findMany({
+    where: { tenantId },
+    orderBy: { sku: 'asc' },
+    select: { id: true, sku: true },
+    take: 12,
+  });
+  if (variants.length < 7) return;
+  const LOW_TARGETS = [2, 3, 4, 3, 2]; // 5 low-stock variants
+  const OOS_COUNT = 2;
+  const plan = [
+    ...LOW_TARGETS.map((target, i) => ({ variant: variants[i], target })),
+    ...Array.from({ length: OOS_COUNT }, (_, i) => ({
+      variant: variants[LOW_TARGETS.length + i],
+      target: 0,
+    })),
+  ];
+  for (const p of plan) {
+    const cur = await tx.inventoryLevel.findUnique({
+      where: { tenantId_variantId: { tenantId, variantId: p.variant.id } },
+    });
+    if (!cur) continue;
+    const delta = p.target - cur.stockOnHand;
+    if (delta === 0) continue;
+    await tx.inventoryLevel.update({
+      where: { tenantId_variantId: { tenantId, variantId: p.variant.id } },
+      data: { stockOnHand: p.target },
+    });
+    await tx.productVariant.update({
+      where: { id: p.variant.id },
+      data: { stockOnHand: p.target },
+    });
+    await tx.inventoryMovement.create({
+      data: {
+        tenantId,
+        variantId: p.variant.id,
+        type: 'ADJUSTMENT',
+        quantity: delta,
+        reason: p.target === 0 ? 'damage' : 'manual_adjustment',
+        note: p.target === 0 ? 'Demo: OOS state' : 'Demo: low-stock state',
+      },
+    });
+  }
+  console.log(
+    `[seed]   inventory demo: ${LOW_TARGETS.length} low-stock + ${OOS_COUNT} OOS variants in ${subdomain}`,
+  );
 }
 
 async function seedCustomers(

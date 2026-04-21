@@ -43,4 +43,7 @@ export type {
   WebhookDelivery,
   PaymentStatus,
   ShipmentStatus,
+  InventoryMovement,
+  InventoryMovementType,
+  InventoryLevel,
 } from '@prisma/client';

@@ -18,10 +18,10 @@ export function ProductDetailClient({ product }: { product: Product }) {
 
   const stockText = useMemo(() => {
     if (!variant) return null;
-    if (stock <= 0) return { text: 'Stokta yok', tone: 'text-red-600' };
-    if (stock < 5)
+    if (stock <= 0) return { text: 'Tükendi', tone: 'text-red-600' };
+    if (stock <= 10)
       return { text: `Son ${stock} adet`, tone: 'text-amber-700' };
-    return { text: 'Stokta', tone: 'text-emerald-700' };
+    return { text: 'Stokta var', tone: 'text-emerald-700' };
   }, [variant, stock]);
 
   return (
@@ -58,7 +58,7 @@ export function ProductDetailClient({ product }: { product: Product }) {
           variantId={variant.id}
           quantity={quantity}
           disabled={!inStock}
-          label={inStock ? 'Sepete Ekle' : 'Stokta Yok'}
+          label={inStock ? 'Sepete Ekle' : 'Tükendi'}
         />
       ) : null}
     </div>

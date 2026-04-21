@@ -29,6 +29,8 @@ DECLARE
     'order_lines',
     'order_status_history',
     'inventory_reservations',
+    'inventory_movements',
+    'inventory_levels',
     'outbox_events',
     'processed_events',
     'audit_events',
@@ -113,6 +115,14 @@ CREATE POLICY tenant_isolation ON order_lines
   WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
 
 CREATE POLICY tenant_isolation ON inventory_reservations
+  USING      (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+  WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
+
+CREATE POLICY tenant_isolation ON inventory_movements
+  USING      (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+  WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
+
+CREATE POLICY tenant_isolation ON inventory_levels
   USING      (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
   WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
 

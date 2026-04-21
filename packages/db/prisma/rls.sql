@@ -35,7 +35,9 @@ DECLARE
     'coupons',
     'coupon_redemptions',
     'refund_requests',
-    'refunds'
+    'refunds',
+    'webhook_subscriptions',
+    'webhook_deliveries'
   ];
 BEGIN
   FOREACH t IN ARRAY tenant_tables LOOP
@@ -124,6 +126,14 @@ CREATE POLICY tenant_isolation ON refund_requests
   WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
 
 CREATE POLICY tenant_isolation ON refunds
+  USING      (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+  WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
+
+CREATE POLICY tenant_isolation ON webhook_subscriptions
+  USING      (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+  WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
+
+CREATE POLICY tenant_isolation ON webhook_deliveries
   USING      (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
   WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
 

@@ -6,3 +6,5 @@ export * from './cart';
 export * from './checkout';
 export * from './orders';
 export * from './coupons';
+export * from './webhooks';
+export * from './media';

@@ -6,6 +6,7 @@ import clsx from 'clsx';
 import {
   BarChart3,
   Box,
+  Image as ImageIcon,
   Layers,
   Package,
   Percent,
@@ -14,6 +15,7 @@ import {
   ShoppingCart,
   Tag,
   Users,
+  Webhook,
   X,
 } from 'lucide-react';
 
@@ -32,6 +34,8 @@ const NAV: NavItem[] = [
   { href: '/orders/draft', label: 'Taslak Siparişler', icon: Receipt },
   { href: '/coupons', label: 'Kuponlar', icon: Percent },
   { href: '/customers', label: 'Müşteriler', icon: Users },
+  { href: '/media', label: 'Medya Kütüphanesi', icon: ImageIcon },
+  { href: '/webhooks', label: 'Webhookslar', icon: Webhook },
   { href: '/settings', label: 'Ayarlar', icon: Settings },
 ];
 

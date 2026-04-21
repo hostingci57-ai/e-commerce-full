@@ -31,4 +31,9 @@ export type {
   CouponType,
   RefundReasonCategory,
   RefundRequestStatus,
+  MediaAsset,
+  MediaKind,
+  ProcessedEvent,
+  WebhookSubscription,
+  WebhookDelivery,
 } from '@prisma/client';

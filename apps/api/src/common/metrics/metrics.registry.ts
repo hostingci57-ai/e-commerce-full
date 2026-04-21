@@ -17,6 +17,9 @@ class MetricsRegistryHolder {
   readonly httpRequestDuration: Histogram<'method' | 'path'>;
   readonly dbQueryDuration: Histogram<'operation' | 'model'>;
   readonly outboxEventsPublished: Counter<'event_type'>;
+  readonly outboxEventsFailed: Counter<'event_type'>;
+  readonly webhookDeliveries: Counter<'event_type' | 'outcome'>;
+  readonly emailDeliveries: Counter<'template' | 'outcome'>;
   readonly cartOperations: Counter<'op'>;
 
   private constructor() {
@@ -50,6 +53,27 @@ class MetricsRegistryHolder {
       name: 'ecf_outbox_events_published_total',
       help: 'Total outbox events successfully published.',
       labelNames: ['event_type'] as const,
+      registers: [this.registry],
+    });
+
+    this.outboxEventsFailed = new Counter({
+      name: 'ecf_outbox_events_failed_total',
+      help: 'Outbox events that exceeded max attempts and were marked failed.',
+      labelNames: ['event_type'] as const,
+      registers: [this.registry],
+    });
+
+    this.webhookDeliveries = new Counter({
+      name: 'ecf_webhook_deliveries_total',
+      help: 'Webhook HTTP deliveries by outcome.',
+      labelNames: ['event_type', 'outcome'] as const,
+      registers: [this.registry],
+    });
+
+    this.emailDeliveries = new Counter({
+      name: 'ecf_email_deliveries_total',
+      help: 'Email deliveries by outcome.',
+      labelNames: ['template', 'outcome'] as const,
       registers: [this.registry],
     });
 

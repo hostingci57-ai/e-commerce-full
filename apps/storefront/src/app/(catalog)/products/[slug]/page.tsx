@@ -4,7 +4,9 @@ import { api } from '@/lib/api';
 import { getTenantSlug } from '@/lib/tenant-context';
 import { ProductGallery } from '@/components/ProductGallery';
 import { formatPrice } from '@/lib/format';
+import { WishlistButton } from '@/components/WishlistButton';
 import { ProductDetailClient } from './ProductDetailClient';
+import { ProductReviews } from './ProductReviews';
 
 export const dynamic = 'force-dynamic';
 
@@ -96,12 +98,17 @@ export default async function ProductDetailPage({
         <ProductGallery images={product.images ?? []} name={product.name} />
 
         <div className="flex flex-col gap-4">
-          {product.brand ? (
-            <span className="text-sm font-medium text-slate-500">
-              {product.brand.name}
-            </span>
-          ) : null}
-          <h1 className="text-3xl font-bold text-slate-900">{product.name}</h1>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              {product.brand ? (
+                <span className="text-sm font-medium text-slate-500">
+                  {product.brand.name}
+                </span>
+              ) : null}
+              <h1 className="mt-1 text-3xl font-bold text-slate-900">{product.name}</h1>
+            </div>
+            <WishlistButton productId={product.id} />
+          </div>
 
           <div className="flex items-baseline gap-3">
             <span className="text-2xl font-semibold text-slate-900">
@@ -128,6 +135,13 @@ export default async function ProductDetailPage({
           ) : null}
         </div>
       </div>
+
+      <section className="mt-12 border-t border-slate-200 pt-8">
+        <h2 className="mb-4 text-2xl font-semibold text-slate-900">
+          Müşteri Yorumları
+        </h2>
+        <ProductReviews productId={product.id} />
+      </section>
     </div>
   );
 }

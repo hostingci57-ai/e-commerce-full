@@ -48,7 +48,10 @@ DECLARE
     'payments',
     'shipping_method_configs',
     'shipments',
-    'tenant_settings'
+    'tenant_settings',
+    'product_reviews',
+    'wishlist_items',
+    'abandoned_carts'
   ];
 BEGIN
   FOREACH t IN ARRAY tenant_tables LOOP
@@ -191,6 +194,19 @@ CREATE POLICY tenant_isolation ON shipments
   WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
 
 CREATE POLICY tenant_isolation ON tenant_settings
+  USING      (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+  WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
+
+-- Reviews + wishlist + abandoned carts (Faz 8b)
+CREATE POLICY tenant_isolation ON product_reviews
+  USING      (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+  WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
+
+CREATE POLICY tenant_isolation ON wishlist_items
+  USING      (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+  WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
+
+CREATE POLICY tenant_isolation ON abandoned_carts
   USING      (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
   WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
 

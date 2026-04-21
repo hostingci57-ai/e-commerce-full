@@ -1,12 +1,13 @@
 import Link from 'next/link';
 import { formatPrice } from '@/lib/format';
 import type { ProductSummary } from '@/lib/types';
+import { WishlistButton } from './WishlistButton';
 
 export function ProductCard({ product }: { product: ProductSummary }) {
   return (
     <Link
       href={`/products/${product.slug}`}
-      className="group flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-white transition hover:border-brand-500 hover:shadow-md"
+      className="group relative flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-white transition hover:border-brand-500 hover:shadow-md"
     >
       <div className="aspect-square w-full overflow-hidden bg-slate-100">
         {product.image?.url ? (
@@ -22,6 +23,11 @@ export function ProductCard({ product }: { product: ProductSummary }) {
             Gorsel Yok
           </div>
         )}
+      </div>
+      <div className="pointer-events-none absolute right-3 top-3">
+        <div className="pointer-events-auto">
+          <WishlistButton productId={product.id} size="sm" />
+        </div>
       </div>
       <div className="flex flex-1 flex-col gap-1 p-3">
         {product.brand ? (

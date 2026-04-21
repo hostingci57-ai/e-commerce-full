@@ -19,6 +19,12 @@ export default function AccountLayout({
             Siparislerim
           </Link>
           <Link
+            href="/account/wishlist"
+            className="block rounded-md px-3 py-2 text-slate-700 hover:bg-slate-100"
+          >
+            Favorilerim
+          </Link>
+          <Link
             href="/account/addresses"
             className="block rounded-md px-3 py-2 text-slate-700 hover:bg-slate-100"
           >

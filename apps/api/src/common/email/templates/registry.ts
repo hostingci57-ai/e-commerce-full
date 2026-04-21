@@ -93,6 +93,21 @@ Mağaza URL'niz: https://{{subdomain}}.{{baseDomain}}
 
 ECF Ekibi`,
   },
+  'abandoned-cart-recovery': {
+    subject: 'Sepetinizde unuttuğunuz ürünler var',
+    text: `Merhaba,
+
+Sepetinizde tamamlamadığınız ürünler bulunuyor. Alışverişinizi kaldığınız yerden sürdürmek için aşağıdaki bağlantıya tıklayabilirsiniz:
+
+{{resumeUrl}}
+
+Sepet içeriği:
+{{#each items}}- {{title}} x {{qty}} = {{price}}
+{{/each}}
+Toplam: {{total}}
+
+Stoklar tükenebilir, acele edin!`,
+  },
 };
 
 const COMPILED = new Map<string, { subject: HandlebarsTemplateDelegate; text: HandlebarsTemplateDelegate; html?: HandlebarsTemplateDelegate }>();

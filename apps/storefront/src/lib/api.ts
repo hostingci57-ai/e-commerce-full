@@ -367,4 +367,96 @@ export const api = {
     logout: () => fetcher('/auth/logout', { method: 'POST' }),
     refresh: () => fetcher('/auth/refresh', { method: 'POST' }),
   },
+
+  reviews: {
+    stats: (productId: string, opts: FetchOpts = {}) =>
+      fetcher<{
+        average: number;
+        count: number;
+        distribution: Record<string, number>;
+      }>(`/products/${encodeURIComponent(productId)}/reviews/stats`, {
+        revalidate: 60,
+        ...opts,
+      }),
+    list: (
+      productId: string,
+      q: { sort?: 'newest' | 'highest' | 'lowest'; page?: number; pageSize?: number } = {},
+      opts: FetchOpts = {},
+    ) =>
+      fetcher<{
+        items: Array<{
+          id: string;
+          rating: number;
+          title: string | null;
+          comment: string | null;
+          isVerifiedBuyer: boolean;
+          helpfulCount: number;
+          createdAt: string;
+          authorName: string;
+        }>;
+        total: number;
+        page: number;
+        pageSize: number;
+        hasMore: boolean;
+      }>(`/products/${encodeURIComponent(productId)}/reviews${qs(q)}`, {
+        revalidate: 60,
+        ...opts,
+      }),
+    create: (productId: string, body: { rating: number; title?: string; comment?: string }) =>
+      fetcher<{ id: string; status: string }>(
+        `/products/${encodeURIComponent(productId)}/reviews`,
+        { method: 'POST', body: JSON.stringify(body) },
+      ),
+    markHelpful: (id: string) =>
+      fetcher<{ id: string; helpfulCount: number }>(
+        `/reviews/${encodeURIComponent(id)}/helpful`,
+        { method: 'POST' },
+      ),
+  },
+
+  wishlist: {
+    list: (opts: FetchOpts = {}) =>
+      fetcher<
+        Array<{
+          productId: string;
+          variantId: string | null;
+          addedAt: string;
+          product: {
+            id: string;
+            slug: string;
+            title: string;
+            status: string;
+            brand: { id: string; name: string } | null;
+            priceMinor: string | null;
+            compareAtMinor: string | null;
+            currency: string | null;
+            inStock: boolean;
+            defaultVariantId: string | null;
+            image: { id: string; url: string; key: string } | null;
+          } | null;
+        }>
+      >('/customers/me/wishlist', { revalidate: false, ...opts }),
+    add: (productId: string, variantId?: string) =>
+      fetcher('/customers/me/wishlist', {
+        method: 'POST',
+        body: JSON.stringify({ productId, variantId }),
+      }),
+    remove: (productId: string) =>
+      fetcher(`/customers/me/wishlist/${encodeURIComponent(productId)}`, {
+        method: 'DELETE',
+      }),
+    moveToCart: () =>
+      fetcher<{ moved: number; skipped: Array<{ productId: string; reason: string }> }>(
+        '/customers/me/wishlist/move-to-cart',
+        { method: 'POST' },
+      ),
+  },
+
+  cartRecover: {
+    resume: (recoverToken: string) =>
+      fetcher<{ recovered: boolean; items: number }>(
+        `/cart/recover/${encodeURIComponent(recoverToken)}`,
+        { method: 'POST' },
+      ),
+  },
 };

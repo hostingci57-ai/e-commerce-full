@@ -296,3 +296,133 @@ export function updateDraftOrder(
 export function convertDraftOrder(id: string, body: { notifyCustomer?: boolean } = {}) {
   return api.post<DraftOrderListItem>(`/orders/draft/${id}/convert`, body);
 }
+
+// ----- Webhooks -------------------------------------------------------------
+
+export interface WebhookSubscription {
+  id: string;
+  name: string;
+  url: string;
+  secret: string;
+  events: string[];
+  isActive: boolean;
+  lastSuccessAt?: string | null;
+  lastFailureAt?: string | null;
+  failureCount: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface WebhookDelivery {
+  id: string;
+  subscriptionId: string;
+  eventId: string;
+  eventType: string;
+  attempt: number;
+  statusCode?: number | null;
+  responseBody?: string | null;
+  deliveredAt?: string | null;
+  errorMessage?: string | null;
+  createdAt: string;
+}
+
+export function listWebhookSubscriptions() {
+  return api.get<WebhookSubscription[]>('/webhooks/subscriptions');
+}
+export function getWebhookSubscription(id: string) {
+  return api.get<WebhookSubscription>(`/webhooks/subscriptions/${id}`);
+}
+export function createWebhookSubscription(body: {
+  name: string;
+  url: string;
+  events: string[];
+  secret?: string;
+  isActive?: boolean;
+}) {
+  return api.post<WebhookSubscription>('/webhooks/subscriptions', body);
+}
+export function updateWebhookSubscription(
+  id: string,
+  body: Partial<{
+    name: string;
+    url: string;
+    events: string[];
+    secret: string;
+    isActive: boolean;
+  }>,
+) {
+  return api.patch<WebhookSubscription>(`/webhooks/subscriptions/${id}`, body);
+}
+export function deleteWebhookSubscription(id: string) {
+  return api.delete<{ ok: true }>(`/webhooks/subscriptions/${id}`);
+}
+export function listWebhookDeliveries(
+  id: string,
+  params: { status?: 'success' | 'failed' | 'pending'; limit?: number; cursor?: string } = {},
+) {
+  return api.get<CursorResponse<WebhookDelivery>>(
+    `/webhooks/subscriptions/${id}/deliveries`,
+    params,
+  );
+}
+export function retryWebhookDelivery(subId: string, deliveryId: string) {
+  return api.post<{ ok: true }>(
+    `/webhooks/subscriptions/${subId}/retry/${deliveryId}`,
+  );
+}
+
+// ----- Media Library --------------------------------------------------------
+
+export type MediaKind = 'IMAGE' | 'VIDEO' | 'DOCUMENT';
+
+export interface MediaAsset {
+  id: string;
+  key: string;
+  filename: string;
+  contentType: string;
+  sizeBytes: string | number;
+  width?: number | null;
+  height?: number | null;
+  kind: MediaKind;
+  tags: string[];
+  uploadedBy?: string | null;
+  createdAt: string;
+}
+
+export function requestPresignedUpload(body: {
+  filename: string;
+  contentType: string;
+  sizeBytes: number;
+}) {
+  return api.post<{ key: string; uploadUrl: string; expiresAt: string }>(
+    '/media/presigned-url',
+    body,
+  );
+}
+export function createMediaAsset(body: {
+  key: string;
+  filename: string;
+  contentType: string;
+  sizeBytes: number;
+  width?: number;
+  height?: number;
+  tags?: string[];
+}) {
+  return api.post<MediaAsset>('/media/assets', body);
+}
+export function listMediaAssets(params: {
+  kind?: MediaKind;
+  tag?: string;
+  limit?: number;
+  cursor?: string;
+} = {}) {
+  return api.get<CursorResponse<MediaAsset>>('/media/assets', params);
+}
+export function getMediaSignedUrl(id: string) {
+  return api.get<{ id: string; url: string; expiresAt: string }>(
+    `/media/assets/${id}/signed-url`,
+  );
+}
+export function deleteMediaAsset(id: string) {
+  return api.delete<{ ok: true }>(`/media/assets/${id}`);
+}

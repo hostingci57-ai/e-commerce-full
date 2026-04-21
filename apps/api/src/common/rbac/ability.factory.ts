@@ -28,7 +28,8 @@ export type Subject =
   | 'TenantMember'
   | 'Role'
   | 'Coupon'
-  | 'Refund';
+  | 'Refund'
+  | 'Webhook';
 
 export type Action = 'manage' | 'create' | 'read' | 'update' | 'delete' | 'invite';
 export type AppAbility = MongoAbility<[Action, Subject]>;

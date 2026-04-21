@@ -24,6 +24,7 @@ import {
   Textarea,
 } from '@/components/ui';
 import { FormField } from '@/components/FormField';
+import { MediaPickerButton } from '@/components/MediaPicker';
 import {
   VariantBuilder,
   type VariantOption,
@@ -253,11 +254,12 @@ export function ProductForm({
               description="Görsel URL'leri ekleyin. Gerçek yükleme özelliği sonraki sürümde eklenecektir."
             />
             <CardBody className="space-y-4">
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Input
                   value={imageInput}
                   onChange={(e) => setImageInput(e.target.value)}
                   placeholder="https://…"
+                  className="flex-1"
                 />
                 <Button
                   type="button"
@@ -266,6 +268,15 @@ export function ProductForm({
                 >
                   <Plus className="h-4 w-4" /> Ekle
                 </Button>
+                <MediaPickerButton
+                  onPick={(url) => {
+                    setValue(
+                      'images',
+                      [...(images ?? []), url],
+                      { shouldDirty: true },
+                    );
+                  }}
+                />
               </div>
               {(images ?? []).length === 0 ? (
                 <p className="text-sm text-slate-500">Henüz görsel yok.</p>

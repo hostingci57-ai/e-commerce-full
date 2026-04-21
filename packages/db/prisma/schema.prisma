@@ -326,20 +326,37 @@ model CategoryProduct {
   @@map("category_products")
 }
 
-model MediaAsset {
-  id        String   @id @default(uuid()) @db.Uuid
-  tenantId  String   @db.Uuid
-  productId String?  @db.Uuid
-  url       String
-  mime      String
-  sizeBytes Int
-  width     Int?
-  height    Int?
-  createdAt DateTime @default(now())
+enum MediaKind {
+  IMAGE
+  VIDEO
+  DOCUMENT
+}
 
-  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+model MediaAsset {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @db.Uuid
+  productId    String?   @db.Uuid
+  /// Object-store key, tenant-prefixed: `tenants/{tenantId}/media/{uuid}.{ext}`
+  key          String    @unique
+  filename     String    @default("")
+  /// MIME type recorded at upload-complete time (source of truth).
+  contentType  String    @default("application/octet-stream") @map("content_type")
+  sizeBytes    BigInt    @default(0) @map("size_bytes")
+  width        Int?
+  height       Int?
+  kind         MediaKind @default(IMAGE)
+  tags         String[]  @default([])
+  uploadedBy   String?   @map("uploaded_by") @db.Uuid
+  /// Legacy column (pre-DAM). Kept for back-compat; DAM consumers should use `key` + a signed URL.
+  url          String    @default("")
+  /// Legacy column (pre-DAM). Mirrored from `contentType` when new DAM uploads land.
+  mime         String    @default("")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  product      Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, productId])
+  @@index([tenantId, kind, createdAt])
   @@map("media_assets")
 }
 
@@ -518,11 +535,12 @@ model OutboxEvent {
 
 model ProcessedEvent {
   tenantId     String   @db.Uuid
-  consumerName String
-  eventId      String   @db.Uuid
-  processedAt  DateTime @default(now())
+  consumerName String   @map("consumer_name")
+  eventId      String   @map("event_id") @db.Uuid
+  processedAt  DateTime @default(now()) @map("processed_at")
 
   @@id([tenantId, consumerName, eventId])
+  @@index([consumerName, processedAt])
   @@map("processed_events")
 }
 
@@ -641,4 +659,51 @@ model Refund {
   @@index([tenantId, orderId])
   @@index([tenantId, refundRequestId])
   @@map("refunds")
+}
+
+// ----------- Webhooks (FSD §6) ----------------------------------------------
+
+model WebhookSubscription {
+  tenantId      String    @map("tenant_id") @db.Uuid
+  id            String    @default(uuid()) @db.Uuid
+  name          String
+  url           String
+  /// Shared secret used to sign `X-Webhook-Signature` (HMAC SHA-256).
+  secret        String
+  /// Subscribed outbox event types, e.g. `['order.created','order.status_changed']`.
+  events        String[]  @default([])
+  isActive      Boolean   @default(true) @map("is_active")
+  lastSuccessAt DateTime? @map("last_success_at")
+  lastFailureAt DateTime? @map("last_failure_at")
+  failureCount  Int       @default(0) @map("failure_count")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  deliveries    WebhookDelivery[]
+
+  @@id([tenantId, id])
+  @@index([tenantId, isActive])
+  @@map("webhook_subscriptions")
+}
+
+model WebhookDelivery {
+  tenantId       String    @map("tenant_id") @db.Uuid
+  id             String    @default(uuid()) @db.Uuid
+  subscriptionId String    @map("subscription_id") @db.Uuid
+  eventId        String    @map("event_id") @db.Uuid
+  eventType      String    @map("event_type")
+  attempt        Int       @default(1)
+  statusCode     Int?      @map("status_code")
+  responseBody   String?   @map("response_body")
+  deliveredAt    DateTime? @map("delivered_at")
+  errorMessage   String?   @map("error_message")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  subscription   WebhookSubscription @relation(fields: [tenantId, subscriptionId], references: [tenantId, id], onDelete: Cascade)
+
+  @@id([tenantId, id])
+  @@index([tenantId, subscriptionId])
+  @@index([tenantId, eventType])
+  @@index([tenantId, createdAt])
+  @@map("webhook_deliveries")
 }

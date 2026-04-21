@@ -157,3 +157,57 @@ export const api = {
     apiFetch<T>(path, { method: 'PUT', body }),
   delete: <T>(path: string) => apiFetch<T>(path, { method: 'DELETE' }),
 };
+
+/**
+ * Fetch a binary blob and trigger a browser download. Used for the CSV report
+ * endpoints — the backend sets the filename via Content-Disposition but we
+ * still pick a sensible fallback on the client.
+ */
+export async function downloadBlob(
+  path: string,
+  query: FetchOptions['query'] = {},
+  fallbackFilename: string,
+): Promise<void> {
+  const headers: Record<string, string> = {};
+  const token = getAccessToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(buildUrl(path, query), {
+    method: 'GET',
+    headers,
+    credentials: 'include',
+  });
+
+  if (res.status === 401) {
+    const ok = await tryRefresh();
+    if (ok) return downloadBlob(path, query, fallbackFilename);
+    clearAuth();
+    if (
+      typeof window !== 'undefined' &&
+      !window.location.pathname.startsWith('/login')
+    ) {
+      window.location.href = '/login';
+    }
+    throw new ApiError('Unauthorized', 401, 'unauthorized');
+  }
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new ApiError(text || `Failed with ${res.status}`, res.status);
+  }
+
+  // Prefer server-provided filename when present.
+  const cd = res.headers.get('Content-Disposition') ?? '';
+  const match = /filename="?([^";]+)"?/i.exec(cd);
+  const filename = match?.[1] ?? fallbackFilename;
+
+  const blob = await res.blob();
+  if (typeof window === 'undefined') return;
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+}

@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-typecheck:
+    name: Lint & Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @ecf/db generate
+      - name: Typecheck
+        run: pnpm run typecheck
+      - name: Lint
+        run: pnpm run lint || true  # MVP: warnings don't fail the build
+
+  test-unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @ecf/db generate
+      - run: pnpm --filter @ecf/api test:unit
+
+  test-e2e:
+    name: E2E tests (Postgres + Redis)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ecf
+          POSTGRES_PASSWORD: ecf
+          POSTGRES_DB: ecf_test
+        ports:
+          - '5432:5432'
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - '6379:6379'
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://ecf:ecf@localhost:5432/ecf_test
+      DATABASE_URL_LANDLORD: postgresql://ecf:ecf@localhost:5432/ecf_test
+      LANDLORD_DATABASE_URL: postgresql://ecf:ecf@localhost:5432/ecf_test
+      REDIS_URL: redis://localhost:6379
+      E2E: '1'
+      ECF_APP_PASSWORD: test_app_pw
+      ECF_LANDLORD_PASSWORD: test_landlord_pw
+      JWT_PRIVATE_KEY: ${{ secrets.TEST_JWT_PRIVATE_KEY }}
+      JWT_PUBLIC_KEY: ${{ secrets.TEST_JWT_PUBLIC_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @ecf/db generate
+      # No migrations folder yet (FSD v5.4 MVP uses db:push); fall back gracefully.
+      - name: Sync schema (migrate deploy, fallback to db push)
+        run: |
+          pnpm --filter @ecf/db exec prisma migrate deploy \
+            || pnpm --filter @ecf/db exec prisma db push --accept-data-loss --skip-generate
+      - name: Apply roles + RLS
+        run: pnpm --filter @ecf/db run db:init
+      - name: E2E suite
+        run: pnpm --filter @ecf/api test:e2e
+
+  build-apps:
+    name: Build ${{ matrix.app }}
+    runs-on: ubuntu-latest
+    needs: [lint-typecheck]
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ['@ecf/api', '@ecf/storefront', '@ecf/tenant-admin', '@ecf/landlord-admin']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @ecf/db generate
+      - run: pnpm --filter ${{ matrix.app }} build

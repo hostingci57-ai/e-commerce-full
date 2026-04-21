@@ -1,0 +1,32 @@
+# Dependencies / build outputs
+**/node_modules
+**/.turbo
+**/dist
+**/.next
+**/coverage
+
+# VCS + CI
+.git
+.github
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Local DB + logs
+project.db
+*.log
+
+# Editor + OS
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# Tests + docs that don't belong in images
+**/*.md
+!README.md
+
+# Agent outputs
+.agents

@@ -138,6 +138,100 @@ docs/
 docker-compose.yml      PostgreSQL 16 + Redis 7 + MinIO
 ```
 
+## Production deployment
+
+### Docker image'lar (GHCR)
+
+`main` push'unda (ve `v*` tag'lerinde) `.github/workflows/docker-publish.yml`
+dört image yayınlar:
+
+- `ghcr.io/hostingci57-ai/ecf-api:latest`
+- `ghcr.io/hostingci57-ai/ecf-storefront:latest`
+- `ghcr.io/hostingci57-ai/ecf-tenant-admin:latest`
+- `ghcr.io/hostingci57-ai/ecf-landlord-admin:latest`
+
+Her image ayrıca `:<git-sha>` tag'i alır (immutable deploy için). Tag push'larında
+ek olarak `:v1.2.3` / `:v1.2` tag'leri üretilir.
+
+Dockerfile'lar `infra/docker/` altında (`api.Dockerfile`, `storefront.Dockerfile`,
+`tenant-admin.Dockerfile`, `landlord-admin.Dockerfile`). Hepsi multi-stage,
+non-root (`ecf`) user, healthcheck'li. Next.js app'ler `output: 'standalone'`
+modunda build edilip sadece minimum server.js + static varlıklar image'a kopyalanır.
+
+### docker-compose.prod.yml ile hızlı deploy
+
+```bash
+cd infra/docker
+# Güvenli parolalarla doldurulmuş .env dosyası hazırla
+cp ../../.env.example .env.production
+# .env.production'u düzenle — güçlü şifre/JWT anahtarları koy
+docker compose --env-file .env.production -f docker-compose.prod.yml pull
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d
+```
+
+Stack: `postgres` + `redis` + `minio` + `api` + `storefront` + `tenant-admin`
++ `landlord-admin` + `nginx` (80/443 subdomain routing).
+
+Örnek `nginx.conf` — `api.platform.local`, `admin.platform.local`,
+`landlord.platform.local` ve wildcard storefront'u yönlendirir.
+
+### Gereken env değişkenleri (özet)
+
+| Env | Kim okuyor | Açıklama |
+|-----|-----------|---------|
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Postgres + API | app rolü için kök kullanıcı |
+| `ECF_APP_PASSWORD` | Postgres init + API (runtime) | `ecf_app` (FORCE RLS) rol şifresi |
+| `ECF_LANDLORD_PASSWORD` | Postgres init + API (runtime) | `ecf_landlord` (BYPASSRLS) rol şifresi |
+| `DATABASE_URL` | API | `postgresql://ecf_app:...@postgres:5432/ecf` (prod'da app rolü) |
+| `DATABASE_URL_LANDLORD` / `LANDLORD_DATABASE_URL` | API | bypass RLS bağlantısı |
+| `REDIS_URL` | API | `redis://redis:6379` |
+| `JWT_PRIVATE_KEY` / `JWT_PUBLIC_KEY` | API | RS256 PEM (multi-line `\n` kaçışlı) |
+| `JWT_ACCESS_TTL` / `JWT_REFRESH_TTL` | API | saniye |
+| `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` | MinIO + API (S3 kimlik) | |
+| `S3_BUCKET` / `S3_REGION` / `S3_ENDPOINT` / `S3_FORCE_PATH_STYLE` | API | media bucket yapılandırması |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | API | bildirim e-postaları |
+| `RATE_LIMIT_TTL` / `RATE_LIMIT_MAX` | API | throttler varsayılan: 60s / 120 istek |
+| `LOG_LEVEL` | API | `info` / `debug` / `warn` |
+| `NEXT_PUBLIC_API_URL` | 3 Next.js app'i | tarayıcının API'ye gideceği URL |
+| `API_INTERNAL_URL` | SSR/server actions | cluster-içi API adresi (`http://api:3001`) |
+
+`JWT_PRIVATE_KEY` + `JWT_PUBLIC_KEY` için:
+```bash
+openssl genpkey -algorithm RSA -out private.pem -pkeyopt rsa_keygen_bits:2048
+openssl rsa -in private.pem -pubout -out public.pem
+# .env'e:
+JWT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+JWT_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----\n"
+```
+
+### CI/CD (GitHub Actions)
+
+- `ci.yml` — PR + `main` push: lint + typecheck, unit tests, E2E (PG+Redis
+  service container'larıyla), 4-matrix build.
+- `docker-publish.yml` — `main` push + `v*` tag'inde 4 image'ı GHCR'a push eder.
+- `security-scan.yml` — Pazartesi 03:00 UTC: `pnpm audit --audit-level=high`
+  + Trivy fs scan. Raporlar bilgi amaçlıdır, CI fail etmez.
+- `dependabot.yml` — haftalık npm (minor/patch gruplandırılmış), aylık
+  github-actions + docker image updates.
+
+**E2E secret'lar:** `TEST_JWT_PRIVATE_KEY` ve `TEST_JWT_PUBLIC_KEY` repo
+secret'larına koyulmalı. Yoksa E2E job'u `JWT_*` yokluğundan kırılır — local
+RS256 anahtar çifti üretip repo secret'ı olarak yükleyin (prod anahtarlarıyla
+**aynı olmasın**).
+
+### Image'ı yerel test
+
+```bash
+docker buildx build -f infra/docker/api.Dockerfile -t ecf-api:dev --load .
+docker buildx build -f infra/docker/storefront.Dockerfile -t ecf-storefront:dev --load .
+# ...
+```
+
+> **Windows notu:** `output: 'standalone'` build adımı Windows'ta pnpm
+> symlink'leri kopyalarken `EPERM` hatası verebilir. CI (Ubuntu) ve Docker
+> build (Alpine) bu sorunu yaşamaz — yerel üretim build denemek için
+> Geliştirici Modu'nu aç veya doğrudan `docker buildx build` kullan.
+
 ## Daha fazla
 
 - Operasyonel işlemler için: [docs/runbook.md](docs/runbook.md)

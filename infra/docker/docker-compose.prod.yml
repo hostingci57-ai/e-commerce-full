@@ -1,0 +1,139 @@
+# -----------------------------------------------------------------------------
+# Production docker-compose for e-commerce-full.
+# Image references assume ghcr.io/hostingci57-ai/ecf-* published by the
+# docker-publish GitHub Actions workflow.
+#
+# Required env (put in .env.production next to this file or export before up):
+#   POSTGRES_PASSWORD, MINIO_ROOT_USER, MINIO_ROOT_PASSWORD
+#   ECF_APP_PASSWORD, ECF_LANDLORD_PASSWORD
+#   JWT_PRIVATE_KEY, JWT_PUBLIC_KEY
+#   SEED_LANDLORD_PASSWORD, SEED_TENANT_OWNER_PASSWORD (optional)
+# -----------------------------------------------------------------------------
+
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ecf}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-ecf}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ecf} -d ${POSTGRES_DB:-ecf}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+    volumes:
+      - miniodata:/data
+    restart: unless-stopped
+
+  api:
+    image: ghcr.io/hostingci57-ai/ecf-api:latest
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ecf}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ecf}
+      DATABASE_URL_LANDLORD: postgresql://ecf_landlord:${ECF_LANDLORD_PASSWORD}@postgres:5432/${POSTGRES_DB:-ecf}
+      LANDLORD_DATABASE_URL: postgresql://ecf_landlord:${ECF_LANDLORD_PASSWORD}@postgres:5432/${POSTGRES_DB:-ecf}
+      REDIS_URL: redis://redis:6379
+      ECF_APP_PASSWORD: ${ECF_APP_PASSWORD:?ECF_APP_PASSWORD is required}
+      ECF_LANDLORD_PASSWORD: ${ECF_LANDLORD_PASSWORD:?ECF_LANDLORD_PASSWORD is required}
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:?JWT_PRIVATE_KEY is required}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:?JWT_PUBLIC_KEY is required}
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-900}
+      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-2592000}
+      S3_ENDPOINT: http://minio:9000
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-ecf-media}
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      S3_FORCE_PATH_STYLE: "true"
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-no-reply@platform.local}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      RATE_LIMIT_TTL: ${RATE_LIMIT_TTL:-60}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-120}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  storefront:
+    image: ghcr.io/hostingci57-ai/ecf-storefront:latest
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://api:3001}
+      API_INTERNAL_URL: http://api:3001
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  tenant-admin:
+    image: ghcr.io/hostingci57-ai/ecf-tenant-admin:latest
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://api:3001}
+      API_INTERNAL_URL: http://api:3001
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  landlord-admin:
+    image: ghcr.io/hostingci57-ai/ecf-landlord-admin:latest
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://api:3001}
+      API_INTERNAL_URL: http://api:3001
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - storefront
+      - tenant-admin
+      - landlord-admin
+      - api
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:
